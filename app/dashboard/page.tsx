@@ -6,6 +6,7 @@ import { useAccount } from "wagmi";
 import { formatUnits } from "viem";
 import { useChecks } from "@/lib/useChecks";
 import { CheckCard } from "@/components/CheckCard";
+import { ProfileTabs } from "@/components/ProfileTabs";
 import { stablecoinByAddress } from "@/lib/format";
 
 export default function DashboardPage() {
@@ -32,6 +33,7 @@ export default function DashboardPage() {
 
   return (
     <div className="container-app py-10">
+      <ProfileTabs />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="eyebrow">Pano</p>

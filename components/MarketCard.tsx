@@ -28,8 +28,12 @@ export function MarketCard({
   const fee = (price * saleFeeBps) / 10000n;
   const total = price + fee;
   const dec = stablecoinByAddress(check.stablecoin)?.decimals ?? 18;
-  const discount =
-    check.principal > 0n ? (1 - Number(formatUnits(price, dec)) / Number(formatUnits(check.principal, dec))) * 100 : 0;
+  const faceN = Number(formatUnits(check.principal, dec));
+  const priceN = Number(formatUnits(price, dec));
+  const discount = check.principal > 0n ? (1 - priceN / faceN) * 100 : 0;
+  // Buyer's annualized return: buy at price now, collect face at maturity.
+  const days = Math.max(1, (Number(check.maturity) - Date.now() / 1000) / 86400);
+  const annual = priceN > 0 ? ((faceN - priceN) / priceN) * (365 / days) * 100 : 0;
 
   const { data: allowance, refetch } = useReadContract({
     address: check.stablecoin,
@@ -75,6 +79,13 @@ export function MarketCard({
         </div>
         {discount > 0 && <span className="pill text-positive">%{discount.toFixed(1)} iskonto</span>}
       </div>
+
+      {annual > 0 && (
+        <div className="mt-4 flex items-baseline justify-between rounded-2xl border border-line bg-surface px-4 py-3">
+          <span className="text-xs text-muted">Yıllık getiri (alıcıya)</span>
+          <span className="font-display text-xl font-bold text-tech">~%{annual.toFixed(1)}</span>
+        </div>
+      )}
 
       <dl className="mt-5 space-y-2.5 text-sm">
         <div className="flex justify-between">
