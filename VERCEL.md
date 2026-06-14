@@ -1,17 +1,19 @@
-# Vercel Preview Deployment
+# Vercel Deployment
 
-The frontend lives in the **`web/`** subdirectory of this monorepo. Vercel must be told this.
+The Next.js app now lives at the **repo root**, so Vercel works with **no special settings** —
+Root Directory stays the default (`./`) and the framework is auto-detected as Next.js.
 
-## 1. Set the Root Directory (REQUIRED — dashboard only)
+## Steps
 
-Vercel project → **Settings → General → Root Directory** → set to **`web`** → Save.
+1. Import the repo in Vercel (already connected).
+2. Leave **Root Directory** as default (`./`). Framework: **Next.js** (auto).
+3. Deploy — every push builds a Preview; the production branch builds Production. Each commit/PR
+   gets its own preview URL.
 
-> This cannot be set from `vercel.json`; it must be done in the dashboard. Without it the build
-> fails because there is no Next.js app at the repo root.
+> The smart-contract tooling lives in `contracts/` and is excluded from the Next.js build
+> (`tsconfig.json` excludes it), so it does not affect the Vercel deployment.
 
-Framework preset auto-detects as **Next.js**. Build command `next build` and output are automatic.
-
-## 2. Environment variables (Settings → Environment Variables)
+## Environment variables (Settings → Environment Variables)
 
 | Variable | Needed for | Value |
 |---|---|---|
@@ -21,11 +23,6 @@ Framework preset auto-detects as **Next.js**. Build command `next build` and out
 
 Without these the preview still builds and renders the UI (wallet connect + pages); on-chain reads
 are empty until a registry is deployed and `NEXT_PUBLIC_REGISTRY_ADDRESS` is set.
-
-## 3. Deploy
-
-Push to the branch — Vercel builds a **Preview** deployment per commit, and a **Production**
-deployment from the production branch. Each PR/commit gets its own preview URL.
 
 ## Making the preview show live data
 

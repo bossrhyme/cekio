@@ -20,8 +20,8 @@ Keep this running and open a second terminal for the next steps.
 npm run deploy:local  # deploys TestUSDC + TestYieldVault + CheckRegistry, whitelists the vault
 ```
 
-This writes `deployments/localhost.json` and populates `web/lib/deployment.local.json` so the
-frontend auto-loads the addresses.
+This writes `deployments/localhost.json` and populates `../lib/deployment.local.json` so the
+frontend (at the repo root) auto-loads the addresses.
 
 ## 3. Verify the flows
 
@@ -33,7 +33,7 @@ npm run automation:local  # keeper path: checkUpkeep -> performUpkeep auto-settl
 ## 4. Run the frontend against the local node
 
 ```bash
-cd ../web
+cd ..        # repo root (Next.js app)
 npm install
 NEXT_PUBLIC_USE_LOCAL=true npm run dev
 ```

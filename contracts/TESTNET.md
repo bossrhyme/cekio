@@ -60,7 +60,7 @@ CHECK_ID=1 npx hardhat run scripts/settle.ts --network baseSepolia
 
 ## Phase 4 — Frontend on testnet
 
-In `web/.env.local`:
+In `.env.local` at the repo root:
 
 ```
 NEXT_PUBLIC_USE_TESTNET=true
@@ -68,10 +68,10 @@ NEXT_PUBLIC_REGISTRY_ADDRESS=<registry from deployments/baseSepolia.json>
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=<your id>
 ```
 
-Then `npm run dev` in `web/` and walk through create → endorse → settle with a wallet on Base Sepolia.
+Then run `npm run dev` from the repo root and walk through create → endorse → settle with a wallet on Base Sepolia.
 
 ## Phase 6 — Mainnet (real addresses) — LAST
 
 Replace the testnet mocks with verified, audited Base mainnet vaults in `scripts/deploy.ts` and
-`web/lib/config.ts`, whitelist them via `setVault`, and transfer ownership to a multisig. Do this
+`lib/config.ts` (repo root), whitelist them via `setVault`, and transfer ownership to a multisig. Do this
 only after fork tests, Slither/Mythril, and an external audit.

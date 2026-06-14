@@ -57,7 +57,7 @@ async function main() {
   console.log(`\nDeployment written to ${file}`);
 
   // Feed the frontend's auto-load file: deployment.testnet.json for Base Sepolia,
-  // deployment.local.json for the local node testbed.
+  // deployment.local.json for the local node testbed. The frontend lives at the repo root.
   const webName =
     network.name === "baseSepolia"
       ? "deployment.testnet.json"
@@ -65,7 +65,7 @@ async function main() {
         ? "deployment.local.json"
         : undefined;
   if (webName) {
-    const webFile = path.resolve(__dirname, "..", "..", "web", "lib", webName);
+    const webFile = path.resolve(__dirname, "..", "..", "lib", webName);
     if (fs.existsSync(path.dirname(webFile))) {
       fs.writeFileSync(webFile, JSON.stringify(deployment, null, 2) + "\n");
       console.log(`Frontend deployment written to ${webFile}`);

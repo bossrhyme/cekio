@@ -32,7 +32,7 @@ Keşideci ──createCheck(miktar, vade, vault)──► CheckRegistry ──de
 ## Depo yapısı
 
 - [`contracts/`](./contracts) — Hardhat + Solidity. `CheckRegistry` (ERC-721 + ERC-4626 escrow), testler, deploy.
-- [`web/`](./web) — Next.js + wagmi/viem + RainbowKit arayüzü (4 ekran).
+- Kök dizin — Next.js + wagmi/viem + RainbowKit arayüzü (4 ekran); Vercel'e doğrudan deploy edilir.
 - `.claude/` — proje subagent ve skill tanımları.
 
 ## Durum
