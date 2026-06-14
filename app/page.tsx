@@ -9,7 +9,7 @@ export default function LandingPage() {
         <div className="container-app relative grid gap-12 py-20 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:py-28">
           <div className="animate-fade-up">
             <span className="pill">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" /> Bin yıllık bir araç, yeni bir çağda
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-tech" /> Zincir üstü çek · DeFi getirisi
             </span>
             <h1 className="mt-6 font-display text-4xl font-bold leading-[1.08] sm:text-6xl">
               Çekin güveni, <span className="gradient-text">zincirin şeffaflığı</span>.
@@ -26,18 +26,20 @@ export default function LandingPage() {
                 Çekin hikâyesi
               </Link>
             </div>
-            <dl className="mt-12 grid max-w-md grid-cols-3 gap-6">
-              {[
-                ["~M.S. 9.yy", "“sakk” → cheque"],
-                ["%100", "anapara kilitli"],
-                ["0", "karşılıksız risk*"],
-              ].map(([v, l]) => (
-                <div key={l}>
-                  <dt className="font-display text-2xl font-bold">{v}</dt>
-                  <dd className="mt-1 text-xs text-muted">{l}</dd>
-                </div>
+            <div className="mt-10 grid max-w-xl grid-cols-3 gap-3">
+              <MetricChip value="%40" label="Yıllık getiri" sub="APY · wiTRY" tech />
+              <MetricChip value="%100" label="Teminatlı" sub="anapara kilitli" />
+              <MetricChip value="On-chain" label="Otomatik ödeme" sub="Ethereum" />
+            </div>
+
+            <div className="mt-7 flex flex-wrap items-center gap-2 text-xs text-muted">
+              <span className="mr-1">Üzerinde çalışır:</span>
+              {["Ethereum", "Brix wiTRY", "Aave", "Chainlink"].map((p) => (
+                <span key={p} className="pill">
+                  {p}
+                </span>
               ))}
-            </dl>
+            </div>
           </div>
 
           <div className="animate-fade-up [animation-delay:120ms]">
@@ -297,7 +299,7 @@ function ChequeMock() {
         </div>
         <div className="mt-6 space-y-3 text-sm">
           <Row k="Vade" v="21 Eylül 2026" />
-          <Row k="Lend" v="Brix wiTRY · %40 APY" accent />
+          <Row k="Lend" v="Brix wiTRY · %40 APY" tech />
           <Row k="Biriken getiri" v="8.350 iTRY" positive />
           <Row k="Alacaklı" v="0x70a9…2C8f" />
         </div>
@@ -310,11 +312,21 @@ function ChequeMock() {
   );
 }
 
-function Row({ k, v, accent, positive }: { k: string; v: string; accent?: boolean; positive?: boolean }) {
+function Row({ k, v, tech, positive }: { k: string; v: string; tech?: boolean; positive?: boolean }) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-muted">{k}</span>
-      <span className={positive ? "text-positive" : accent ? "text-accent" : "text-ink"}>{v}</span>
+      <span className={positive ? "text-positive" : tech ? "text-tech" : "text-ink"}>{v}</span>
+    </div>
+  );
+}
+
+function MetricChip({ value, label, sub, tech }: { value: string; label: string; sub: string; tech?: boolean }) {
+  return (
+    <div className="panel-soft p-4">
+      <div className={`font-display text-2xl font-bold leading-none ${tech ? "text-tech" : "text-ink"}`}>{value}</div>
+      <div className="mt-2 text-xs font-semibold text-ink/80">{label}</div>
+      <div className="text-[11px] text-muted">{sub}</div>
     </div>
   );
 }

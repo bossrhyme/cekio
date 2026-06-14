@@ -11,9 +11,10 @@ const config: Config = {
         card: "#fffaf2", // card surface
         surface: "#f4ebda", // subtle warm inner panels
         line: "#eadfcb", // warm borders
-        accent: { DEFAULT: "#dd7a45", soft: "#eca878" }, // terracotta
+        accent: { DEFAULT: "#dd7a45", soft: "#eca878" }, // terracotta (warm primary)
+        tech: { DEFAULT: "#0f9e8d", soft: "#27b9a7" }, // teal (cool DeFi accent)
         gold: "#e7b35c",
-        positive: "#5da06a",
+        positive: "#2f9e6b",
         warn: "#d99a2f",
         danger: "#d4634a",
         muted: "#9a8c76", // warm taupe
