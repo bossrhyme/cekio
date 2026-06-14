@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { parseUnits } from "viem";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { CHECK_REGISTRY_ABI } from "@/lib/abi";
-import { REGISTRY_ADDRESS, STABLECOINS } from "@/lib/config";
+import { REGISTRY_ADDRESS, STABLECOINS, LEND_VAULTS } from "@/lib/config";
 import { VaultSelector } from "@/components/VaultSelector";
 
 const ERC20_ABI = [
@@ -30,6 +30,8 @@ const ERC20_ABI = [
     outputs: [{ type: "bool" }],
   },
 ] as const;
+
+const registryRead = { address: REGISTRY_ADDRESS, abi: CHECK_REGISTRY_ABI } as const;
 
 export default function CreatePage() {
   const router = useRouter();
@@ -64,6 +66,38 @@ export default function CreatePage() {
   const approveAmount = amountWei + amountWei / 100n;
   const needsApproval = (allowance ?? 0n) < approveAmount;
   const maturityTs = maturity ? Math.floor(new Date(maturity).getTime() / 1000) : 0;
+
+  // On-chain fee rates (uint16 → number); fall back to the planned schedule.
+  const { data: perfFeeBps } = useReadContract({ ...registryRead, functionName: "perfFeeBps" });
+  const { data: createFeeBps } = useReadContract({ ...registryRead, functionName: "createFeeBps" });
+
+  // Cost & maturity-return estimate.
+  const summary = useMemo(() => {
+    const principalN = Number(amount || "0");
+    const days = maturityTs > 0 ? Math.max(0, (maturityTs - Date.now() / 1000) / 86400) : 0;
+    const apy = LEND_VAULTS.find((v) => v.address.toLowerCase() === vault.toLowerCase())?.apy ?? 0;
+    const createBps = Number(createFeeBps ?? 10);
+    const perfBps = Number(perfFeeBps ?? 1000);
+    const createFee = (principalN * createBps) / 10000;
+    const grossYield = (principalN * (apy / 100) * days) / 365;
+    const perfFee = (grossYield * perfBps) / 10000;
+    return {
+      ok: principalN > 0 && days > 0 && /^0x[a-fA-F0-9]{40}$/.test(vault),
+      principalN,
+      days: Math.ceil(days),
+      apy,
+      createBps,
+      perfBps,
+      createFee,
+      totalNow: principalN + createFee,
+      grossYield,
+      perfFee,
+      netYield: grossYield - perfFee,
+    };
+  }, [amount, maturityTs, vault, createFeeBps, perfFeeBps]);
+
+  const fmt = (n: number) =>
+    `${n.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ${stablecoin.symbol}`;
 
   const valid =
     isConnected &&
@@ -159,6 +193,28 @@ export default function CreatePage() {
           <VaultSelector stablecoinSymbol={symbol} value={vault} onChange={setVault} />
         </div>
 
+        {/* Maliyet & vade sonu özeti */}
+        {summary.ok && (
+          <div className="panel-soft p-4">
+            <p className="mb-3 text-sm font-semibold">Özet ({summary.days} gün vade)</p>
+            <dl className="space-y-2 text-sm">
+              <Line k="Çek tutarı (anapara)" v={fmt(summary.principalN)} />
+              <Line k={`Oluşturma ücreti (%${(summary.createBps / 100).toFixed(2)})`} v={`+ ${fmt(summary.createFee)}`} muted />
+              <div className="my-2 border-t border-line" />
+              <Line k="Şimdi ödenecek toplam" v={fmt(summary.totalNow)} strong />
+              <div className="my-2 border-t border-line" />
+              <Line k={`Tahmini getiri (~%${summary.apy} yıllık)`} v={`+ ${fmt(summary.grossYield)}`} tech />
+              <Line k={`Protokol payı (%${(summary.perfBps / 100).toFixed(0)} getiriden)`} v={`− ${fmt(summary.perfFee)}`} muted />
+              <Line k="Vade sonunda sana dönen getiri" v={fmt(summary.netYield)} positive />
+              <Line k="Vade sonunda alacaklıya ödenecek" v={fmt(summary.principalN)} />
+            </dl>
+            <p className="mt-3 text-xs text-muted">
+              Getiri tahminîdir; gerçek oran lend platformunun değişken APY'sine göre belirlenir. Anapara her
+              zaman tam ödenir.
+            </p>
+          </div>
+        )}
+
         {error && <p className="text-sm text-danger">{error}</p>}
 
         <div className="flex gap-3 pt-2">
@@ -173,6 +229,7 @@ export default function CreatePage() {
           )}
         </div>
         {!isConnected && <p className="text-sm text-muted">Devam etmek için cüzdanınızı bağlayın.</p>}
+        {/* summary helper rendered above */}
 
         <p className="border-t border-line pt-3 text-xs text-muted">
           Ücretler: oluşturmada <span className="text-ink">%0.1</span>, getiriden{" "}
@@ -180,6 +237,36 @@ export default function CreatePage() {
           tam tutarı alır.
         </p>
       </div>
+    </div>
+  );
+}
+
+function Line({
+  k,
+  v,
+  strong,
+  muted,
+  tech,
+  positive,
+}: {
+  k: string;
+  v: string;
+  strong?: boolean;
+  muted?: boolean;
+  tech?: boolean;
+  positive?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <dt className={muted ? "text-muted" : "text-ink/80"}>{k}</dt>
+      <dd
+        className={
+          (strong ? "font-display text-lg font-bold " : "") +
+          (positive ? "text-positive" : tech ? "text-tech" : muted ? "text-muted" : "text-ink")
+        }
+      >
+        {v}
+      </dd>
     </div>
   );
 }
