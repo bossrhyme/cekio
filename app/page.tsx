@@ -29,9 +29,9 @@ export default function LandingPage() {
             </div>
             <dl className="mt-12 grid max-w-md grid-cols-3 gap-6">
               {[
-                ["%4–8", "lend getirisi (APY)"],
+                ["%5–40", "lend getirisi (APY)"],
                 ["100%", "anapara kilitli"],
-                ["0", "karşılıksız risk*"],
+                ["TRY", "iTRY ile yerli çek"],
               ].map(([v, l]) => (
                 <div key={l}>
                   <dt className="font-display text-2xl font-bold">{v}</dt>
@@ -152,10 +152,10 @@ const FEATURES = [
 ];
 
 const PLATFORMS = [
-  { name: "Aave v3", apy: "~5% APY" },
-  { name: "Morpho", apy: "~6.8% APY" },
-  { name: "Yearn v3", apy: "~5.5% APY" },
-  { name: "Sky sUSDS", apy: "~4.5% APY" },
+  { name: "Brix wiTRY", apy: "~%40 APY · TRY" },
+  { name: "Aave v3", apy: "~%5 APY · USD" },
+  { name: "Morpho", apy: "~%6.8 APY" },
+  { name: "Sky sUSDS", apy: "~%4.5 APY" },
 ];
 
 function ChequeMock() {
@@ -171,13 +171,13 @@ function ChequeMock() {
         <div className="mt-6">
           <p className="text-sm text-muted">Tutar</p>
           <p className="font-display text-4xl font-bold">
-            25.000 <span className="text-xl text-muted">USDC</span>
+            250.000 <span className="text-xl text-muted">iTRY</span>
           </p>
         </div>
         <div className="mt-6 space-y-3 text-sm">
           <Row k="Vade" v="21 Eylül 2026" />
-          <Row k="Lend" v="Aave v3 · %5.2 APY" accent />
-          <Row k="Biriken getiri" v="312,40 USDC" positive />
+          <Row k="Lend" v="Brix wiTRY · %40 APY" accent />
+          <Row k="Biriken getiri" v="8.350 iTRY" positive />
           <Row k="Alacaklı" v="0x70a9…2C8f" />
         </div>
         <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10">

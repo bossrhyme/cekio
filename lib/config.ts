@@ -33,11 +33,18 @@ export type Stablecoin = {
   decimals: number;
 };
 
-/** Supported stablecoins (Base mainnet). Verify addresses before production use. */
+/**
+ * Supported stablecoins. iTRY (Brix on-chain Turkish Lira) is the default.
+ * TODO: replace iTRY/USDT addresses + decimals with verified values from https://docs.brix.money
+ * and the target chain (Ethereum mainnet, where iTRY/wiTRY live).
+ */
 const MAINNET_STABLECOINS: Stablecoin[] = [
-  { symbol: "USDC", address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", decimals: 6 },
-  { symbol: "USDbC", address: "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA", decimals: 6 },
-  { symbol: "DAI", address: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb", decimals: 18 },
+  // Default — Brix iTRY (Turkish Lira). Address TBD (verify on docs.brix.money / Etherscan).
+  { symbol: "iTRY", address: "0x0000000000000000000000000000000000000000", decimals: 18 },
+  // USDC (Ethereum mainnet)
+  { symbol: "USDC", address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", decimals: 6 },
+  // USDT (Ethereum mainnet)
+  { symbol: "USDT", address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", decimals: 6 },
 ];
 
 const DEPLOYED_STABLECOINS: Stablecoin[] = activeDeployment.stablecoins.map((s) => ({
@@ -60,10 +67,20 @@ export type LendVault = {
 };
 
 /**
- * Whitelisted ERC-4626 yield vaults (low-risk only). These must also be whitelisted on-chain via
- * CheckRegistry.setVault. Mainnet addresses are placeholders — replace with verified Base vaults.
+ * Whitelisted ERC-4626 yield vaults (low-risk only). Must also be whitelisted on-chain via
+ * CheckRegistry.setVault. Addresses are placeholders — replace with verified values
+ * (see contracts/INTEGRATIONS.md; run scripts/check-vault.ts before whitelisting).
  */
 const MAINNET_VAULTS: LendVault[] = [
+  // Default — Brix wiTRY: Turkish-Lira money-market yield (ERC-4626 / LayerZero OVault).
+  {
+    label: "Brix wiTRY",
+    protocol: "Brix",
+    address: "0x0000000000000000000000000000000000000000",
+    stablecoin: "iTRY",
+    apy: 40,
+    risk: "low",
+  },
   {
     label: "Aave v3 USDC",
     protocol: "Aave",
@@ -73,19 +90,11 @@ const MAINNET_VAULTS: LendVault[] = [
     risk: "low",
   },
   {
-    label: "Morpho Steakhouse USDC",
-    protocol: "Morpho",
+    label: "Aave v3 USDT",
+    protocol: "Aave",
     address: "0x0000000000000000000000000000000000000002",
-    stablecoin: "USDC",
-    apy: 6.8,
-    risk: "medium",
-  },
-  {
-    label: "Sky sUSDS",
-    protocol: "Sky",
-    address: "0x0000000000000000000000000000000000000003",
-    stablecoin: "DAI",
-    apy: 4.5,
+    stablecoin: "USDT",
+    apy: 5.0,
     risk: "low",
   },
 ];
