@@ -6,7 +6,10 @@ export type Deployment = {
   chainId: number;
   registry: string;
   stablecoins: { symbol: string; address: string; decimals: number }[];
+  /** `address` is the ILendingAdapter passed to createCheck. */
   vaults: { label: string; address: string; stablecoin: string; apy?: number }[];
+  /** Underlying mock ERC-4626 vault (testnet only) — used to simulate yield in demos. */
+  testVault?: string;
   deployedAt: string;
 };
 

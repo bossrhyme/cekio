@@ -51,10 +51,28 @@ historically much higher than USD rates. The "yield → drawer" feature becomes 
 3. `registry.setVault(iTRY, wiTRY, true)`.
 4. Add iTRY (stablecoin) + wiTRY (vault) to `lib/config.ts`.
 
-### Open items to confirm
+## Architecture: adapters + cooldown
 
-- [ ] wiTRY exposes the full ERC-4626 interface (`deposit`/`redeem`/`convertToAssets`). If it only
-      offers `wrap`/`unwrap`, a thin `ILendingAdapter` wrapper is needed.
-- [ ] Target chain for our deployment (Ethereum mainnet vs MegaETH). MegaETH must be added to
-      `lib/wagmi.ts` as a custom chain if chosen.
-- [ ] iTRY / wiTRY verified contract addresses.
+`CheckRegistry` talks to an **`ILendingAdapter`**, not a raw vault, so instant and cooldown venues
+share one interface:
+
+- **`ERC4626Adapter`** — instant ERC-4626 vaults (Aave, Sky, Morpho). Redeem is immediate.
+- **`BrixWiTRYAdapter`** — Brix wiTRY with a **3-day unstake cooldown** (wiTRY burned → iTRYSilo →
+  withdraw after cooldown). Each redemption uses an isolated `BrixSiloHelper` so overlapping
+  cooldowns don't commingle.
+
+For cooldown adapters the keeper calls **`prepareRedeem`** at `maturity − cooldown` (starts the
+unstake) and **`settle`** at maturity (pays out) — so the payee is still paid exactly at maturity.
+This flow is covered by tests via `MockCooldownAdapter`.
+
+Whitelist the **adapter** (not the raw vault): `registry.setVault(asset, adapter, true)`. Deploy
+adapters via `scripts/deploy.ts` (`adapterType: "erc4626" | "brix"`).
+
+## Open items to confirm (Brix, before mainnet)
+
+- [ ] **Confirm wiTRY's exact ABI** — `BrixWiTRYAdapter`/`IBrixWiTRY` assume Ethena-style
+      `cooldownShares(shares)` + `unstake(receiver)` + `cooldownDuration()`. Verify against the
+      deployed wiTRY (0xE346C29b5B60Ef870b9724c57ccfbBc631e47DEE) and adjust if different.
+- [ ] **Fork-test** the Brix adapter against Ethereum mainnet state (deposit → cooldown → unstake).
+- [ ] Confirm iTRY decimals (assumed 18).
+- [ ] Run `scripts/check-vault.ts` against wiTRY to confirm `asset() == iTRY`.

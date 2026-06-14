@@ -74,11 +74,13 @@ export type LendVault = {
  * (see contracts/INTEGRATIONS.md; run scripts/check-vault.ts before whitelisting).
  */
 const MAINNET_VAULTS: LendVault[] = [
-  // Default — Brix wiTRY (ERC-4626): Turkish-Lira money-market yield. Ethereum mainnet.
+  // Default — Brix wiTRY (Turkish-Lira money-market yield, 3-day cooldown).
+  // NOTE: `address` must be the deployed BrixWiTRYAdapter (set after scripts/deploy.ts on mainnet),
+  // NOT the raw wiTRY token (0xE346C29b5B60Ef870b9724c57ccfbBc631e47DEE) — createCheck takes an adapter.
   {
     label: "Brix wiTRY",
     protocol: "Brix",
-    address: "0xE346C29b5B60Ef870b9724c57ccfbBc631e47DEE",
+    address: "0x0000000000000000000000000000000000000000",
     stablecoin: "iTRY",
     apy: 40,
     risk: "low",

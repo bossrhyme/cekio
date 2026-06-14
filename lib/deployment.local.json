@@ -12,10 +12,11 @@
   "vaults": [
     {
       "label": "Test Yield USDC",
-      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
       "stablecoin": "tUSDC",
       "apy": 5
     }
   ],
-  "deployedAt": "2026-06-14T20:45:45.846Z"
+  "testVault": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+  "deployedAt": "2026-06-14T21:38:26.822Z"
 }

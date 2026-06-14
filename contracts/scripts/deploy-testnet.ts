@@ -37,11 +37,18 @@ async function main() {
   const registryAddr = await registry.getAddress();
   console.log(`CheckRegistry: ${registryAddr}`);
 
-  // 4. Whitelist the vault for tUSDC
-  await (await registry.setVault(usdcAddr, vaultAddr, true)).wait();
-  console.log(`Whitelisted vault ${vaultAddr} for ${usdcAddr}`);
+  // 4. Instant ERC-4626 adapter wrapping the vault, owned by the registry
+  const Adapter = await ethers.getContractFactory("ERC4626Adapter");
+  const adapter = await Adapter.deploy(vaultAddr, registryAddr);
+  await adapter.waitForDeployment();
+  const adapterAddr = await adapter.getAddress();
+  console.log(`ERC4626Adapter: ${adapterAddr}`);
 
-  // 5. Seed deployer with faucet funds (skip on read-only)
+  // 5. Whitelist the adapter for tUSDC
+  await (await registry.setVault(usdcAddr, adapterAddr, true)).wait();
+  console.log(`Whitelisted adapter ${adapterAddr} for ${usdcAddr}`);
+
+  // 6. Seed deployer with faucet funds
   await (await usdc.mint(deployer.address, 1_000_000e6)).wait();
   console.log(`Minted 1,000,000 tUSDC to deployer`);
 
@@ -50,7 +57,8 @@ async function main() {
     chainId: Number(net.chainId),
     registry: registryAddr,
     stablecoins: [{ symbol: "tUSDC", address: usdcAddr, decimals: 6 }],
-    vaults: [{ label: "Test Yield USDC", address: vaultAddr, stablecoin: "tUSDC", apy: 5 }],
+    vaults: [{ label: "Test Yield USDC", address: adapterAddr, stablecoin: "tUSDC", apy: 5 }],
+    testVault: vaultAddr,
     deployedAt: new Date().toISOString(),
   };
   const file = writeDeployment(deployment);

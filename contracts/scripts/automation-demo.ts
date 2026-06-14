@@ -18,7 +18,7 @@ async function main() {
 
   const [deployer, payee] = await ethers.getSigners();
   const usdc = await ethers.getContractAt("TestUSDC", d.stablecoins[0].address);
-  const vault = await ethers.getContractAt("TestYieldVault", d.vaults[0].address);
+  const vault = await ethers.getContractAt("TestYieldVault", d.testVault ?? d.vaults[0].address);
   const registry = await ethers.getContractAt("CheckRegistry", d.registry);
 
   const amount = parseUnits("250", 6);
@@ -32,7 +32,7 @@ async function main() {
   const id = (await registry.nextId()) - 1n;
   console.log(`✓ created cheque #${id} (matures in 60s), tx ${rc?.hash}`);
 
-  await (await usdc.approve(d.vaults[0].address, yieldAmt)).wait();
+  await (await usdc.approve(await vault.getAddress(), yieldAmt)).wait();
   await (await vault.simulateYield(yieldAmt)).wait();
 
   // Before maturity, the keeper should report no work.

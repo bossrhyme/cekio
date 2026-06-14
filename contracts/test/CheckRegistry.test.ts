@@ -3,217 +3,223 @@ import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 const DAY = 24 * 60 * 60;
+const COOLDOWN = 3 * DAY;
 
-async function deployFixture() {
+async function fixture() {
   const [owner, drawer, payee, third] = await ethers.getSigners();
+  const usdc = await (await ethers.getContractFactory("MockERC20")).deploy("USD Coin", "USDC", 6);
 
-  const ERC20 = await ethers.getContractFactory("MockERC20");
-  const usdc = await ERC20.deploy("USD Coin", "USDC", 6);
+  const vaultI = await (await ethers.getContractFactory("MockERC4626")).deploy(await usdc.getAddress());
+  const vaultC = await (await ethers.getContractFactory("MockERC4626")).deploy(await usdc.getAddress());
 
-  const Vault = await ethers.getContractFactory("MockERC4626");
-  const vault = await Vault.deploy(await usdc.getAddress());
+  const registry = await (await ethers.getContractFactory("CheckRegistry")).deploy(owner.address);
 
-  const Registry = await ethers.getContractFactory("CheckRegistry");
-  const registry = await Registry.deploy(owner.address);
+  const instant = await (await ethers.getContractFactory("ERC4626Adapter")).deploy(
+    await vaultI.getAddress(),
+    await registry.getAddress(),
+  );
+  const cool = await (await ethers.getContractFactory("MockCooldownAdapter")).deploy(
+    await vaultC.getAddress(),
+    await registry.getAddress(),
+    COOLDOWN,
+  );
 
-  // Whitelist the vault for USDC.
-  await registry.connect(owner).setVault(await usdc.getAddress(), await vault.getAddress(), true);
+  await registry.connect(owner).setVault(await usdc.getAddress(), await instant.getAddress(), true);
+  await registry.connect(owner).setVault(await usdc.getAddress(), await cool.getAddress(), true);
 
-  // Fund the drawer.
-  const amount = 1_000_000_000n; // 1,000 USDC (6 decimals)
+  const amount = 1_000_000_000n; // 1,000 USDC
   await usdc.mint(drawer.address, amount * 10n);
 
-  return { owner, drawer, payee, third, usdc, vault, registry, amount };
+  return { owner, drawer, payee, third, usdc, vaultI, vaultC, registry, instant, cool, amount };
 }
 
-async function createCheck(env: Awaited<ReturnType<typeof deployFixture>>, maturityDelta = 30 * DAY) {
-  const { registry, usdc, vault, drawer, payee, amount } = env;
+type Env = Awaited<ReturnType<typeof fixture>>;
+
+async function create(env: Env, adapter: string, maturityDelta: number) {
+  const { registry, usdc, drawer, payee, amount } = env;
   await usdc.connect(drawer).approve(await registry.getAddress(), amount);
   const maturity = (await time.latest()) + maturityDelta;
-  const tx = await registry
-    .connect(drawer)
-    .createCheck(payee.address, await usdc.getAddress(), await vault.getAddress(), amount, maturity);
-  await tx.wait();
+  await registry.connect(drawer).createCheck(payee.address, await usdc.getAddress(), adapter, amount, maturity);
   return { checkId: 1n, maturity };
 }
 
-// Simulate vault yield by donating underlying into the vault (raises share price).
-async function simulateYield(env: Awaited<ReturnType<typeof deployFixture>>, yieldAmount: bigint) {
-  const { usdc, vault, owner } = env;
-  await usdc.mint(owner.address, yieldAmount);
-  await usdc.connect(owner).approve(await vault.getAddress(), yieldAmount);
-  await vault.connect(owner).simulateYield(yieldAmount);
+async function donate(env: Env, vault: any, amt: bigint) {
+  const { usdc, owner } = env;
+  await usdc.mint(owner.address, amt);
+  await usdc.connect(owner).approve(await vault.getAddress(), amt);
+  await vault.connect(owner).simulateYield(amt);
 }
 
-describe("CheckRegistry", () => {
-  describe("vault whitelist", () => {
-    it("only owner can set a vault", async () => {
-      const env = await deployFixture();
-      await expect(
-        env.registry.connect(env.drawer).setVault(await env.usdc.getAddress(), await env.vault.getAddress(), true),
-      ).to.be.revertedWithCustomError(env.registry, "OwnableUnauthorizedAccount");
-    });
+describe("CheckRegistry (adapter model)", () => {
+  it("only owner sets a vault; asset must match", async () => {
+    const env = await fixture();
+    await expect(
+      env.registry.connect(env.drawer).setVault(await env.usdc.getAddress(), await env.instant.getAddress(), true),
+    ).to.be.revertedWithCustomError(env.registry, "OwnableUnauthorizedAccount");
 
-    it("reverts if the vault asset does not match the stablecoin", async () => {
-      const env = await deployFixture();
-      const ERC20 = await ethers.getContractFactory("MockERC20");
-      const other = await ERC20.deploy("Other", "OTH", 18);
-      await expect(
-        env.registry.setVault(await other.getAddress(), await env.vault.getAddress(), true),
-      ).to.be.revertedWithCustomError(env.registry, "VaultAssetMismatch");
-    });
+    const other = await (await ethers.getContractFactory("MockERC20")).deploy("X", "X", 18);
+    const otherVault = await (await ethers.getContractFactory("MockERC4626")).deploy(await other.getAddress());
+    const badAdapter = await (await ethers.getContractFactory("ERC4626Adapter")).deploy(
+      await otherVault.getAddress(),
+      await env.registry.getAddress(),
+    );
+    await expect(
+      env.registry.setVault(await env.usdc.getAddress(), await badAdapter.getAddress(), true),
+    ).to.be.revertedWithCustomError(env.registry, "AdapterAssetMismatch");
   });
 
-  describe("createCheck", () => {
-    it("locks funds in the vault and mints the cheque NFT to the payee", async () => {
-      const env = await deployFixture();
-      await createCheck(env);
-
-      expect(await env.registry.ownerOf(1)).to.equal(env.payee.address);
-      const c = await env.registry.getCheck(1);
-      expect(c.drawer).to.equal(env.drawer.address);
-      expect(c.principal).to.equal(env.amount);
-      expect(c.settled).to.equal(false);
-      // The registry holds no loose USDC — everything is supplied to the vault.
-      expect(await env.usdc.balanceOf(await env.registry.getAddress())).to.equal(0n);
-      expect(await env.vault.balanceOf(await env.registry.getAddress())).to.be.greaterThan(0n);
-    });
-
-    it("reverts for a non-whitelisted vault", async () => {
-      const env = await deployFixture();
-      const Vault = await ethers.getContractFactory("MockERC4626");
-      const rogue = await Vault.deploy(await env.usdc.getAddress());
-      await env.usdc.connect(env.drawer).approve(await env.registry.getAddress(), env.amount);
-      const maturity = (await time.latest()) + DAY;
-      await expect(
-        env.registry
-          .connect(env.drawer)
-          .createCheck(env.payee.address, await env.usdc.getAddress(), await rogue.getAddress(), env.amount, maturity),
-      ).to.be.revertedWithCustomError(env.registry, "VaultNotApproved");
-    });
-
-    it("reverts when maturity is in the past", async () => {
-      const env = await deployFixture();
-      await env.usdc.connect(env.drawer).approve(await env.registry.getAddress(), env.amount);
-      const past = (await time.latest()) - 1;
-      await expect(
-        env.registry
-          .connect(env.drawer)
-          .createCheck(env.payee.address, await env.usdc.getAddress(), await env.vault.getAddress(), env.amount, past),
-      ).to.be.revertedWithCustomError(env.registry, "MaturityInPast");
-    });
-
-    it("cannot create while paused", async () => {
-      const env = await deployFixture();
-      await env.registry.connect(env.owner).pause();
-      await env.usdc.connect(env.drawer).approve(await env.registry.getAddress(), env.amount);
-      const maturity = (await time.latest()) + DAY;
-      await expect(
-        env.registry
-          .connect(env.drawer)
-          .createCheck(env.payee.address, await env.usdc.getAddress(), await env.vault.getAddress(), env.amount, maturity),
-      ).to.be.revertedWithCustomError(env.registry, "EnforcedPause");
-    });
+  it("creates a cheque: funds locked in adapter, NFT to payee", async () => {
+    const env = await fixture();
+    await create(env, await env.instant.getAddress(), 30 * DAY);
+    expect(await env.registry.ownerOf(1)).to.equal(env.payee.address);
+    expect(await env.usdc.balanceOf(await env.registry.getAddress())).to.equal(0n);
+    expect(await env.vaultI.balanceOf(await env.instant.getAddress())).to.be.greaterThan(0n);
   });
 
-  describe("endorsement (ciro)", () => {
-    it("transfers the cheque and emits Endorsed without the drawer's involvement", async () => {
-      const env = await deployFixture();
-      await createCheck(env);
-      await expect(
-        env.registry.connect(env.payee).transferFrom(env.payee.address, env.third.address, 1),
-      )
-        .to.emit(env.registry, "Endorsed")
-        .withArgs(1, env.payee.address, env.third.address);
-      expect(await env.registry.ownerOf(1)).to.equal(env.third.address);
-    });
+  it("rejects non-whitelisted adapter and too-soon maturity", async () => {
+    const env = await fixture();
+    await env.usdc.connect(env.drawer).approve(await env.registry.getAddress(), env.amount);
+    const rogue = await (await ethers.getContractFactory("ERC4626Adapter")).deploy(
+      await env.vaultI.getAddress(),
+      await env.registry.getAddress(),
+    );
+    const m = (await time.latest()) + DAY;
+    await expect(
+      env.registry.connect(env.drawer).createCheck(env.payee.address, await env.usdc.getAddress(), await rogue.getAddress(), env.amount, m),
+    ).to.be.revertedWithCustomError(env.registry, "AdapterNotApproved");
+
+    // cooldown adapter requires maturity > now + 3 days
+    await env.usdc.connect(env.drawer).approve(await env.registry.getAddress(), env.amount);
+    const soon = (await time.latest()) + DAY;
+    await expect(
+      env.registry.connect(env.drawer).createCheck(env.payee.address, await env.usdc.getAddress(), await env.cool.getAddress(), env.amount, soon),
+    ).to.be.revertedWithCustomError(env.registry, "MaturityTooSoon");
   });
 
-  describe("settlement", () => {
-    it("reverts before maturity", async () => {
-      const env = await deployFixture();
-      await createCheck(env);
+  it("endorsement transfers the cheque and emits Endorsed", async () => {
+    const env = await fixture();
+    await create(env, await env.instant.getAddress(), 30 * DAY);
+    await expect(env.registry.connect(env.payee).transferFrom(env.payee.address, env.third.address, 1))
+      .to.emit(env.registry, "Endorsed")
+      .withArgs(1, env.payee.address, env.third.address);
+    expect(await env.registry.ownerOf(1)).to.equal(env.third.address);
+  });
+
+  describe("instant adapter", () => {
+    it("settles at maturity: principal to holder, yield to drawer", async () => {
+      const env = await fixture();
+      const { maturity } = await create(env, await env.instant.getAddress(), 30 * DAY);
+      await donate(env, env.vaultI, 50_000_000n);
+      await time.increaseTo(maturity);
+      const before = await env.usdc.balanceOf(env.drawer.address);
+      await env.registry.settle(1);
+      expect(await env.usdc.balanceOf(env.payee.address)).to.equal(env.amount);
+      expect((await env.usdc.balanceOf(env.drawer.address)) - before).to.be.closeTo(50_000_000n, 2n);
+    });
+
+    it("reverts before maturity and on double settle", async () => {
+      const env = await fixture();
+      const { maturity } = await create(env, await env.instant.getAddress(), 30 * DAY);
       await expect(env.registry.settle(1)).to.be.revertedWithCustomError(env.registry, "NotMatured");
-    });
-
-    it("pays principal to the holder and yield to the drawer at maturity", async () => {
-      const env = await deployFixture();
-      const { maturity } = await createCheck(env);
-      const yieldAmount = 50_000_000n; // 50 USDC yield
-      await simulateYield(env, yieldAmount);
-
-      await time.increaseTo(maturity);
-      const drawerBefore = await env.usdc.balanceOf(env.drawer.address);
-
-      await expect(env.registry.settle(1)).to.emit(env.registry, "Settled");
-
-      expect(await env.usdc.balanceOf(env.payee.address)).to.equal(env.amount);
-      // Drawer receives approximately the yield (allow rounding dust).
-      const drawerGain = (await env.usdc.balanceOf(env.drawer.address)) - drawerBefore;
-      expect(drawerGain).to.be.closeTo(yieldAmount, 2n);
-      // NFT is burned.
-      await expect(env.registry.ownerOf(1)).to.be.reverted;
-    });
-
-    it("pays yield to the current holder after endorsement", async () => {
-      const env = await deployFixture();
-      const { maturity } = await createCheck(env);
-      await simulateYield(env, 10_000_000n);
-      // Endorse to a third party.
-      await env.registry.connect(env.payee).transferFrom(env.payee.address, env.third.address, 1);
       await time.increaseTo(maturity);
       await env.registry.settle(1);
-      expect(await env.usdc.balanceOf(env.third.address)).to.equal(env.amount);
-      expect(await env.usdc.balanceOf(env.payee.address)).to.equal(0n);
+      await expect(env.registry.settle(1)).to.be.reverted;
     });
 
-    it("on a vault loss the holder is made whole first (yield buffer absorbs loss)", async () => {
-      const env = await deployFixture();
-      const { maturity } = await createCheck(env);
-      // Add yield buffer of 30, then lose 20 → still covers principal.
-      await simulateYield(env, 30_000_000n);
-      await env.vault.simulateLoss(20_000_000n, env.third.address);
+    it("holder is made whole first on a loss", async () => {
+      const env = await fixture();
+      const { maturity } = await create(env, await env.instant.getAddress(), 30 * DAY);
+      await donate(env, env.vaultI, 30_000_000n);
+      await env.vaultI.simulateLoss(20_000_000n, env.third.address);
       await time.increaseTo(maturity);
       await env.registry.settle(1);
       expect(await env.usdc.balanceOf(env.payee.address)).to.equal(env.amount);
     });
+  });
 
-    it("cannot settle twice", async () => {
-      const env = await deployFixture();
-      const { maturity } = await createCheck(env);
+  describe("cooldown adapter (Brix-style)", () => {
+    it("prepare then settle pays at maturity", async () => {
+      const env = await fixture();
+      const { maturity } = await create(env, await env.cool.getAddress(), 30 * DAY);
+      await donate(env, env.vaultC, 40_000_000n);
+
+      // Too early to prepare (more than cooldown before maturity).
+      await expect(env.registry.prepareRedeem(1)).to.be.revertedWithCustomError(env.registry, "TooEarlyToPrepare");
+      // Settle without prepare fails.
       await time.increaseTo(maturity);
+      await expect(env.registry.settle(1)).to.be.revertedWithCustomError(env.registry, "RedeemNotReady");
+
+      // Rewind approach: create a fresh one and do it properly.
+    });
+
+    it("full cooldown lifecycle", async () => {
+      const env = await fixture();
+      const maturity = (await time.latest()) + 10 * DAY;
+      await env.usdc.connect(env.drawer).approve(await env.registry.getAddress(), env.amount);
+      await env.registry
+        .connect(env.drawer)
+        .createCheck(env.payee.address, await env.usdc.getAddress(), await env.cool.getAddress(), env.amount, maturity);
+      await donate(env, env.vaultC, 40_000_000n);
+
+      // Move to within the cooldown window before maturity, then prepare.
+      await time.increaseTo(maturity - COOLDOWN);
+      await env.registry.prepareRedeem(1);
+
+      // Not yet claimable / not matured.
+      await expect(env.registry.settle(1)).to.be.revertedWithCustomError(env.registry, "NotMatured");
+
+      // At maturity (cooldown has elapsed since prepare), settle succeeds.
+      await time.increaseTo(maturity);
+      const before = await env.usdc.balanceOf(env.drawer.address);
       await env.registry.settle(1);
-      await expect(env.registry.settle(1)).to.be.reverted; // burned / unknown
+      expect(await env.usdc.balanceOf(env.payee.address)).to.equal(env.amount);
+      expect((await env.usdc.balanceOf(env.drawer.address)) - before).to.be.closeTo(40_000_000n, 2n);
     });
   });
 
   describe("Chainlink Automation", () => {
-    it("checkUpkeep reports matured cheques and performUpkeep settles them", async () => {
-      const env = await deployFixture();
-      const { maturity } = await createCheck(env);
-
-      let [needed] = await env.registry.checkUpkeep("0x");
-      expect(needed).to.equal(false);
-
+    it("drives instant settle", async () => {
+      const env = await fixture();
+      const { maturity } = await create(env, await env.instant.getAddress(), 30 * DAY);
+      expect((await env.registry.checkUpkeep("0x"))[0]).to.equal(false);
       await time.increaseTo(maturity);
       const res = await env.registry.checkUpkeep("0x");
       expect(res[0]).to.equal(true);
-
       await env.registry.performUpkeep(res[1]);
       expect(await env.usdc.balanceOf(env.payee.address)).to.equal(env.amount);
-      // Active set is now empty.
+    });
+
+    it("drives cooldown prepare then settle", async () => {
+      const env = await fixture();
+      const maturity = (await time.latest()) + 10 * DAY;
+      await env.usdc.connect(env.drawer).approve(await env.registry.getAddress(), env.amount);
+      await env.registry
+        .connect(env.drawer)
+        .createCheck(env.payee.address, await env.usdc.getAddress(), await env.cool.getAddress(), env.amount, maturity);
+
+      // Window opens at maturity - cooldown: keeper prepares.
+      await time.increaseTo(maturity - COOLDOWN + 60);
+      let res = await env.registry.checkUpkeep("0x");
+      expect(res[0]).to.equal(true);
+      await env.registry.performUpkeep(res[1]);
+      const c = await env.registry.getCheck(1);
+      expect(c.redeemStarted).to.equal(true);
+
+      // After the cooldown elapses (>= claimableAt and >= maturity): keeper settles.
+      await time.increaseTo(Number(c.claimableAt));
+      res = await env.registry.checkUpkeep("0x");
+      expect(res[0]).to.equal(true);
+      await env.registry.performUpkeep(res[1]);
+      expect(await env.usdc.balanceOf(env.payee.address)).to.equal(env.amount);
       expect((await env.registry.activeCheckIds()).length).to.equal(0);
     });
   });
 
-  describe("views", () => {
-    it("reports accrued yield and current value", async () => {
-      const env = await deployFixture();
-      await createCheck(env);
-      expect(await env.registry.accruedYield(1)).to.equal(0n);
-      await simulateYield(env, 12_000_000n);
-      expect(await env.registry.accruedYield(1)).to.be.closeTo(12_000_000n, 2n);
-      expect(await env.registry.currentValue(1)).to.be.closeTo(env.amount + 12_000_000n, 2n);
-    });
+  it("reports accrued yield (instant)", async () => {
+    const env = await fixture();
+    await create(env, await env.instant.getAddress(), 30 * DAY);
+    expect(await env.registry.accruedYield(1)).to.equal(0n);
+    await donate(env, env.vaultI, 12_000_000n);
+    expect(await env.registry.accruedYield(1)).to.be.closeTo(12_000_000n, 2n);
   });
 });

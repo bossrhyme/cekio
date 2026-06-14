@@ -24,7 +24,7 @@ async function main() {
   const ttl = Number(process.env.DEMO_MATURITY_SECONDS ?? "300");
 
   const usdc = await ethers.getContractAt("TestUSDC", d.stablecoins[0].address);
-  const vault = await ethers.getContractAt("TestYieldVault", d.vaults[0].address);
+  const vault = await ethers.getContractAt("TestYieldVault", d.testVault ?? d.vaults[0].address);
   const registry = await ethers.getContractAt("CheckRegistry", d.registry);
 
   // Ensure the deployer holds enough tUSDC.
@@ -40,7 +40,7 @@ async function main() {
   // Donate simulated yield.
   if (yieldAmt > 0n) {
     if ((await usdc.balanceOf(deployer.address)) < yieldAmt) await (await usdc.faucet()).wait();
-    await (await usdc.approve(d.vaults[0].address, yieldAmt)).wait();
+    await (await usdc.approve(await vault.getAddress(), yieldAmt)).wait();
     await (await vault.simulateYield(yieldAmt)).wait();
     console.log(`Donated ${process.env.DEMO_YIELD ?? "5"} tUSDC of simulated yield`);
   }

@@ -15,8 +15,12 @@ async function main() {
   const usdc = USDC;
   const vault = await (await ethers.getContractFactory("TestYieldVault")).deploy(await usdc.getAddress());
   const registry = await (await ethers.getContractFactory("CheckRegistry")).deploy(drawer.address);
+  const adapter = await (await ethers.getContractFactory("ERC4626Adapter")).deploy(
+    await vault.getAddress(),
+    await registry.getAddress(),
+  );
 
-  await (await registry.setVault(await usdc.getAddress(), await vault.getAddress(), true)).wait();
+  await (await registry.setVault(await usdc.getAddress(), await adapter.getAddress(), true)).wait();
 
   const amount = parseUnits("1000", 6);
   const yieldAmount = parseUnits("40", 6);
@@ -25,8 +29,8 @@ async function main() {
   // Create the cheque (maturity 1 hour out).
   const maturity = (await ethers.provider.getBlock("latest"))!.timestamp + 3600;
   await (await usdc.approve(await registry.getAddress(), amount)).wait();
-  await (await registry.createCheck(payee.address, await usdc.getAddress(), await vault.getAddress(), amount, maturity)).wait();
-  console.log("✓ cheque #1 created, principal locked in vault");
+  await (await registry.createCheck(payee.address, await usdc.getAddress(), await adapter.getAddress(), amount, maturity)).wait();
+  console.log("✓ cheque #1 created, principal locked via adapter");
 
   // Simulate yield by donating into the vault.
   await (await usdc.approve(await vault.getAddress(), yieldAmount)).wait();

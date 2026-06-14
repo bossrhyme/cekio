@@ -11,9 +11,9 @@ async function main() {
   const amt = parseUnits(process.env.DONATE ?? "25", 6);
 
   const usdc = await ethers.getContractAt("TestUSDC", d.stablecoins[0].address);
-  const vault = await ethers.getContractAt("TestYieldVault", d.vaults[0].address);
+  const vault = await ethers.getContractAt("TestYieldVault", d.testVault ?? d.vaults[0].address);
   if ((await usdc.balanceOf(deployer.address)) < amt) await (await usdc.mint(deployer.address, amt)).wait();
-  await (await usdc.approve(d.vaults[0].address, amt)).wait();
+  await (await usdc.approve(await vault.getAddress(), amt)).wait();
   await (await vault.simulateYield(amt)).wait();
   console.log(`Donated ${process.env.DONATE ?? "25"} tUSDC of yield to ${d.vaults[0].address}`);
 }
