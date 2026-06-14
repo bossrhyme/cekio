@@ -26,6 +26,8 @@ async function fixture() {
 
   await registry.connect(owner).setVault(await usdc.getAddress(), await instant.getAddress(), true);
   await registry.connect(owner).setVault(await usdc.getAddress(), await cool.getAddress(), true);
+  // Zero fees for the mechanics tests; the dedicated "fees" block sets them explicitly.
+  await registry.connect(owner).setFees(0, 0, 0, owner.address);
 
   const amount = 1_000_000_000n; // 1,000 USDC
   await usdc.mint(drawer.address, amount * 10n);
@@ -221,5 +223,64 @@ describe("CheckRegistry (adapter model)", () => {
     expect(await env.registry.accruedYield(1)).to.equal(0n);
     await donate(env, env.vaultI, 12_000_000n);
     expect(await env.registry.accruedYield(1)).to.be.closeTo(12_000_000n, 2n);
+  });
+
+  describe("fees & marketplace", () => {
+    async function withFees(env: Env) {
+      // 10% perf, 0.1% create, 0.5% sale; treasury = `third` for isolation.
+      await env.registry.connect(env.owner).setFees(1000, 10, 50, env.third.address);
+    }
+
+    it("charges a 0.1% creation fee on top of principal", async () => {
+      const env = await fixture();
+      await withFees(env);
+      const treBefore = await env.usdc.balanceOf(env.third.address);
+      await env.usdc.connect(env.drawer).approve(await env.registry.getAddress(), env.amount * 2n);
+      const maturity = (await time.latest()) + 30 * DAY;
+      await env.registry
+        .connect(env.drawer)
+        .createCheck(env.payee.address, await env.usdc.getAddress(), await env.instant.getAddress(), env.amount, maturity);
+      // Fee = 0.1% of 1,000 = 1 USDC.
+      expect((await env.usdc.balanceOf(env.third.address)) - treBefore).to.equal(env.amount / 1000n);
+      // Full principal still backs the cheque.
+      expect((await env.registry.getCheck(1)).principal).to.equal(env.amount);
+    });
+
+    it("takes a 10% performance fee from yield, never from principal", async () => {
+      const env = await fixture();
+      await withFees(env);
+      await env.usdc.connect(env.drawer).approve(await env.registry.getAddress(), env.amount * 2n);
+      const maturity = (await time.latest()) + 30 * DAY;
+      await env.registry
+        .connect(env.drawer)
+        .createCheck(env.payee.address, await env.usdc.getAddress(), await env.instant.getAddress(), env.amount, maturity);
+      await donate(env, env.vaultI, 100_000_000n); // 100 USDC yield
+      const treBefore = await env.usdc.balanceOf(env.third.address);
+      const drawerBefore = await env.usdc.balanceOf(env.drawer.address);
+      await time.increaseTo(maturity);
+      await env.registry.settle(1);
+      expect(await env.usdc.balanceOf(env.payee.address)).to.equal(env.amount); // principal intact
+      expect((await env.usdc.balanceOf(env.third.address)) - treBefore).to.be.closeTo(10_000_000n, 2n); // 10% of 100
+      expect((await env.usdc.balanceOf(env.drawer.address)) - drawerBefore).to.be.closeTo(90_000_000n, 2n); // 90%
+    });
+
+    it("secondary sale: buyer gets the cheque, seller paid minus 0.5% fee", async () => {
+      const env = await fixture();
+      // Treasury = owner; buyer = third. Create fee 0 here to isolate the 0.5% sale fee.
+      await env.registry.connect(env.owner).setFees(1000, 0, 50, env.owner.address);
+      await create(env, await env.instant.getAddress(), 30 * DAY); // payee holds cheque #1
+      const price = 970_000_000n; // 970 USDC (early discount on 1,000 face)
+      await env.registry.connect(env.payee).listForSale(1, price);
+
+      await env.usdc.mint(env.third.address, price);
+      await env.usdc.connect(env.third).approve(await env.registry.getAddress(), price);
+      const treBefore = await env.usdc.balanceOf(env.owner.address);
+
+      await env.registry.connect(env.third).buy(1);
+      const fee = (price * 50n) / 10_000n;
+      expect(await env.registry.ownerOf(1)).to.equal(env.third.address); // buyer now holds it
+      expect(await env.usdc.balanceOf(env.payee.address)).to.equal(price - fee); // seller proceeds
+      expect((await env.usdc.balanceOf(env.owner.address)) - treBefore).to.equal(fee); // treasury fee
+    });
   });
 });

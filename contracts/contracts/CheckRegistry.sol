@@ -42,15 +42,31 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
         Settle
     }
 
+    struct Listing {
+        address seller;
+        uint256 price; // in the cheque's stablecoin
+    }
+
     mapping(uint256 => Check) public checks;
     /// @dev stablecoin => adapter => allowed (owner-curated, low-risk adapters only).
     mapping(address => mapping(address => bool)) public approvedAdapter;
+    /// @dev checkId => secondary-market listing (early sale / "kırdırma").
+    mapping(uint256 => Listing) public listings;
 
     uint256[] private _activeIds;
     mapping(uint256 => uint256) private _activeIndexPlusOne;
 
     uint256 public nextId = 1;
     uint256 public constant MAX_BATCH = 20;
+
+    // --- Fees (basis points; principal is never touched) ---
+    address public treasury;
+    uint16 public perfFeeBps = 1000; // 10% of yield to the protocol
+    uint16 public createFeeBps = 10; // 0.1% of principal at creation (paid on top by drawer)
+    uint16 public saleFeeBps = 50; // 0.5% of secondary-sale price
+    uint16 public constant MAX_PERF_FEE_BPS = 2000; // 20% cap
+    uint16 public constant MAX_CREATE_FEE_BPS = 100; // 1% cap
+    uint16 public constant MAX_SALE_FEE_BPS = 200; // 2% cap
 
     event AdapterSet(address indexed stablecoin, address indexed adapter, bool allowed);
     event CheckCreated(
@@ -64,7 +80,13 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
     );
     event Endorsed(uint256 indexed checkId, address indexed from, address indexed to);
     event RedeemStarted(uint256 indexed checkId, uint256 ticket, uint64 claimableAt);
-    event Settled(uint256 indexed checkId, address indexed payee, uint256 toPayee, address drawer, uint256 toDrawer);
+    event Settled(
+        uint256 indexed checkId, address indexed payee, uint256 toPayee, address drawer, uint256 toDrawer, uint256 fee
+    );
+    event Listed(uint256 indexed checkId, address indexed seller, uint256 price);
+    event ListingCancelled(uint256 indexed checkId);
+    event Sold(uint256 indexed checkId, address indexed seller, address indexed buyer, uint256 price, uint256 fee);
+    event FeesUpdated(uint16 perfFeeBps, uint16 createFeeBps, uint16 saleFeeBps, address treasury);
 
     error ZeroAddress();
     error ZeroAmount();
@@ -77,8 +99,13 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
     error RedeemNotReady();
     error AlreadyStarted();
     error TooEarlyToPrepare();
+    error FeeTooHigh();
+    error NotHolder();
+    error NotListed();
 
-    constructor(address initialOwner) ERC721("OnChain Check", "CHK") Ownable(initialOwner) {}
+    constructor(address initialOwner) ERC721("OnChain Check", "CHK") Ownable(initialOwner) {
+        treasury = initialOwner;
+    }
 
     // --------------------------------------------------------------------- admin
     function setVault(address stablecoin, address adapter, bool allowed) external onlyOwner {
@@ -86,6 +113,21 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
         if (allowed && ILendingAdapter(adapter).asset() != stablecoin) revert AdapterAssetMismatch();
         approvedAdapter[stablecoin][adapter] = allowed;
         emit AdapterSet(stablecoin, adapter, allowed);
+    }
+
+    function setFees(uint16 perfFeeBps_, uint16 createFeeBps_, uint16 saleFeeBps_, address treasury_)
+        external
+        onlyOwner
+    {
+        if (perfFeeBps_ > MAX_PERF_FEE_BPS || createFeeBps_ > MAX_CREATE_FEE_BPS || saleFeeBps_ > MAX_SALE_FEE_BPS) {
+            revert FeeTooHigh();
+        }
+        if (treasury_ == address(0)) revert ZeroAddress();
+        perfFeeBps = perfFeeBps_;
+        createFeeBps = createFeeBps_;
+        saleFeeBps = saleFeeBps_;
+        treasury = treasury_;
+        emit FeesUpdated(perfFeeBps_, createFeeBps_, saleFeeBps_, treasury_);
     }
 
     function pause() external onlyOwner {
@@ -111,7 +153,11 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
         uint256 cd = ILendingAdapter(adapter).cooldown();
         if (maturity <= block.timestamp + cd) revert MaturityTooSoon();
 
-        // Move funds to the adapter and deposit.
+        // Creation fee (0.1%) is paid by the drawer on top of the principal — principal is deposited in full.
+        uint256 createFee = (amount * createFeeBps) / 10_000;
+        if (createFee > 0) IERC20(stablecoin).safeTransferFrom(msg.sender, treasury, createFee);
+
+        // Move the full principal to the adapter and deposit.
         IERC20(stablecoin).safeTransferFrom(msg.sender, adapter, amount);
         uint256 shares = ILendingAdapter(adapter).deposit(amount);
 
@@ -184,13 +230,17 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
         _burn(checkId);
 
         uint256 redeemed = ILendingAdapter(c.adapter).completeRedeem(c.redeemTicket, address(this));
+        // Holder is always made whole on principal first; only the yield is fee-bearing.
         uint256 toPayee = redeemed >= c.principal ? c.principal : redeemed;
-        uint256 toDrawer = redeemed - toPayee;
+        uint256 yieldAmt = redeemed - toPayee;
+        uint256 fee = (yieldAmt * perfFeeBps) / 10_000;
+        uint256 toDrawer = yieldAmt - fee;
 
         IERC20(c.stablecoin).safeTransfer(payee, toPayee);
         if (toDrawer > 0) IERC20(c.stablecoin).safeTransfer(c.drawer, toDrawer);
+        if (fee > 0) IERC20(c.stablecoin).safeTransfer(treasury, fee);
 
-        emit Settled(checkId, payee, toPayee, c.drawer, toDrawer);
+        emit Settled(checkId, payee, toPayee, c.drawer, toDrawer, fee);
     }
 
     // --------------------------------------------------------------------- automation
@@ -254,10 +304,49 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
         return _activeIds;
     }
 
+    // --------------------------------------------------------------- secondary market (kırdırma)
+    /// @notice List a cheque for early sale (factoring alternative). Holder only.
+    function listForSale(uint256 checkId, uint256 price) external {
+        if (ownerOf(checkId) != msg.sender) revert NotHolder();
+        if (checks[checkId].settled) revert AlreadySettled();
+        if (price == 0) revert ZeroAmount();
+        listings[checkId] = Listing({seller: msg.sender, price: price});
+        emit Listed(checkId, msg.sender, price);
+    }
+
+    function cancelListing(uint256 checkId) external {
+        if (listings[checkId].seller != msg.sender) revert NotHolder();
+        delete listings[checkId];
+        emit ListingCancelled(checkId);
+    }
+
+    /// @notice Buy a listed cheque: buyer pays `price` in the cheque's stablecoin; a sale fee goes to
+    ///         the treasury, the rest to the seller, and the cheque NFT transfers to the buyer.
+    function buy(uint256 checkId) external nonReentrant {
+        Listing memory l = listings[checkId];
+        if (l.price == 0) revert NotListed();
+        Check storage c = checks[checkId];
+        if (c.settled) revert AlreadySettled();
+        if (ownerOf(checkId) != l.seller) revert NotListed(); // stale listing
+
+        uint256 fee = (l.price * saleFeeBps) / 10_000;
+        uint256 toSeller = l.price - fee;
+        delete listings[checkId];
+
+        IERC20(c.stablecoin).safeTransferFrom(msg.sender, l.seller, toSeller);
+        if (fee > 0) IERC20(c.stablecoin).safeTransferFrom(msg.sender, treasury, fee);
+        _transfer(l.seller, msg.sender, checkId);
+
+        emit Sold(checkId, l.seller, msg.sender, l.price, fee);
+    }
+
     // --------------------------------------------------------------------- endorsement
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = super._update(to, tokenId, auth);
-        if (from != address(0) && to != address(0)) emit Endorsed(tokenId, from, to);
+        if (from != address(0)) {
+            if (listings[tokenId].price != 0) delete listings[tokenId]; // clear stale listing on move/burn
+            if (to != address(0)) emit Endorsed(tokenId, from, to);
+        }
         return from;
     }
 

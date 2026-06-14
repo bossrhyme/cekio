@@ -12,7 +12,22 @@ export const CHECK_REGISTRY_ABI = [
   },
   {
     "inputs": [],
+    "name": "AdapterAssetMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "AdapterNotApproved",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "AlreadySettled",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "AlreadyStarted",
     "type": "error"
   },
   {
@@ -130,7 +145,22 @@ export const CHECK_REGISTRY_ABI = [
   },
   {
     "inputs": [],
-    "name": "MaturityInPast",
+    "name": "FeeTooHigh",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "MaturityTooSoon",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotHolder",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotListed",
     "type": "error"
   },
   {
@@ -162,6 +192,11 @@ export const CHECK_REGISTRY_ABI = [
   },
   {
     "inputs": [],
+    "name": "RedeemNotReady",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "ReentrancyGuardReentrantCall",
     "type": "error"
   },
@@ -178,17 +213,12 @@ export const CHECK_REGISTRY_ABI = [
   },
   {
     "inputs": [],
+    "name": "TooEarlyToPrepare",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "UnknownCheck",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "VaultAssetMismatch",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "VaultNotApproved",
     "type": "error"
   },
   {
@@ -200,6 +230,31 @@ export const CHECK_REGISTRY_ABI = [
     "inputs": [],
     "name": "ZeroAmount",
     "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "stablecoin",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "adapter",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "allowed",
+        "type": "bool"
+      }
+    ],
+    "name": "AdapterSet",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -281,7 +336,7 @@ export const CHECK_REGISTRY_ABI = [
       {
         "indexed": false,
         "internalType": "address",
-        "name": "vault",
+        "name": "adapter",
         "type": "address"
       },
       {
@@ -323,6 +378,75 @@ export const CHECK_REGISTRY_ABI = [
       }
     ],
     "name": "Endorsed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint16",
+        "name": "perfFeeBps",
+        "type": "uint16"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint16",
+        "name": "createFeeBps",
+        "type": "uint16"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint16",
+        "name": "saleFeeBps",
+        "type": "uint16"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "treasury",
+        "type": "address"
+      }
+    ],
+    "name": "FeesUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "seller",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "price",
+        "type": "uint256"
+      }
+    ],
+    "name": "Listed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      }
+    ],
+    "name": "ListingCancelled",
     "type": "event"
   },
   {
@@ -386,6 +510,31 @@ export const CHECK_REGISTRY_ABI = [
         "type": "uint256"
       },
       {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "ticket",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "claimableAt",
+        "type": "uint64"
+      }
+    ],
+    "name": "RedeemStarted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      },
+      {
         "indexed": true,
         "internalType": "address",
         "name": "payee",
@@ -408,9 +557,52 @@ export const CHECK_REGISTRY_ABI = [
         "internalType": "uint256",
         "name": "toDrawer",
         "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
       }
     ],
     "name": "Settled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "seller",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "buyer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "price",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
+      }
+    ],
+    "name": "Sold",
     "type": "event"
   },
   {
@@ -452,38 +644,52 @@ export const CHECK_REGISTRY_ABI = [
     "type": "event"
   },
   {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "stablecoin",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "vault",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "allowed",
-        "type": "bool"
-      }
-    ],
-    "name": "VaultSet",
-    "type": "event"
-  },
-  {
     "inputs": [],
-    "name": "MAX_SETTLE_BATCH",
+    "name": "MAX_BATCH",
     "outputs": [
       {
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_CREATE_FEE_BPS",
+    "outputs": [
+      {
+        "internalType": "uint16",
+        "name": "",
+        "type": "uint16"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_PERF_FEE_BPS",
+    "outputs": [
+      {
+        "internalType": "uint16",
+        "name": "",
+        "type": "uint16"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_SALE_FEE_BPS",
+    "outputs": [
+      {
+        "internalType": "uint16",
+        "name": "",
+        "type": "uint16"
       }
     ],
     "stateMutability": "view",
@@ -559,7 +765,7 @@ export const CHECK_REGISTRY_ABI = [
         "type": "address"
       }
     ],
-    "name": "approvedVault",
+    "name": "approvedAdapter",
     "outputs": [
       {
         "internalType": "bool",
@@ -587,6 +793,32 @@ export const CHECK_REGISTRY_ABI = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      }
+    ],
+    "name": "buy",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      }
+    ],
+    "name": "cancelListing",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -635,7 +867,7 @@ export const CHECK_REGISTRY_ABI = [
       },
       {
         "internalType": "address",
-        "name": "vault",
+        "name": "adapter",
         "type": "address"
       },
       {
@@ -649,6 +881,11 @@ export const CHECK_REGISTRY_ABI = [
         "type": "uint256"
       },
       {
+        "internalType": "uint256",
+        "name": "redeemTicket",
+        "type": "uint256"
+      },
+      {
         "internalType": "uint64",
         "name": "createdAt",
         "type": "uint64"
@@ -657,6 +894,16 @@ export const CHECK_REGISTRY_ABI = [
         "internalType": "uint64",
         "name": "maturity",
         "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "claimableAt",
+        "type": "uint64"
+      },
+      {
+        "internalType": "bool",
+        "name": "redeemStarted",
+        "type": "bool"
       },
       {
         "internalType": "bool",
@@ -681,7 +928,7 @@ export const CHECK_REGISTRY_ABI = [
       },
       {
         "internalType": "address",
-        "name": "vault",
+        "name": "adapter",
         "type": "address"
       },
       {
@@ -704,6 +951,19 @@ export const CHECK_REGISTRY_ABI = [
       }
     ],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "createFeeBps",
+    "outputs": [
+      {
+        "internalType": "uint16",
+        "name": "",
+        "type": "uint16"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -768,7 +1028,7 @@ export const CHECK_REGISTRY_ABI = [
           },
           {
             "internalType": "address",
-            "name": "vault",
+            "name": "adapter",
             "type": "address"
           },
           {
@@ -782,6 +1042,11 @@ export const CHECK_REGISTRY_ABI = [
             "type": "uint256"
           },
           {
+            "internalType": "uint256",
+            "name": "redeemTicket",
+            "type": "uint256"
+          },
+          {
             "internalType": "uint64",
             "name": "createdAt",
             "type": "uint64"
@@ -790,6 +1055,16 @@ export const CHECK_REGISTRY_ABI = [
             "internalType": "uint64",
             "name": "maturity",
             "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "claimableAt",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bool",
+            "name": "redeemStarted",
+            "type": "bool"
           },
           {
             "internalType": "bool",
@@ -824,6 +1099,48 @@ export const CHECK_REGISTRY_ABI = [
         "internalType": "bool",
         "name": "",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "price",
+        "type": "uint256"
+      }
+    ],
+    "name": "listForSale",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "listings",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "seller",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "price",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -921,6 +1238,19 @@ export const CHECK_REGISTRY_ABI = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "perfFeeBps",
+    "outputs": [
+      {
+        "internalType": "uint16",
+        "name": "",
+        "type": "uint16"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "bytes",
@@ -929,6 +1259,19 @@ export const CHECK_REGISTRY_ABI = [
       }
     ],
     "name": "performUpkeep",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      }
+    ],
+    "name": "prepareRedeem",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -992,6 +1335,19 @@ export const CHECK_REGISTRY_ABI = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "saleFeeBps",
+    "outputs": [
+      {
+        "internalType": "uint16",
+        "name": "",
+        "type": "uint16"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -1012,13 +1368,41 @@ export const CHECK_REGISTRY_ABI = [
   {
     "inputs": [
       {
+        "internalType": "uint16",
+        "name": "perfFeeBps_",
+        "type": "uint16"
+      },
+      {
+        "internalType": "uint16",
+        "name": "createFeeBps_",
+        "type": "uint16"
+      },
+      {
+        "internalType": "uint16",
+        "name": "saleFeeBps_",
+        "type": "uint16"
+      },
+      {
+        "internalType": "address",
+        "name": "treasury_",
+        "type": "address"
+      }
+    ],
+    "name": "setFees",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "stablecoin",
         "type": "address"
       },
       {
         "internalType": "address",
-        "name": "vault",
+        "name": "adapter",
         "type": "address"
       },
       {
@@ -1130,6 +1514,19 @@ export const CHECK_REGISTRY_ABI = [
     "name": "transferOwnership",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "treasury",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {

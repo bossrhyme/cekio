@@ -60,7 +60,9 @@ export default function CreatePage() {
     query: { enabled: !!address },
   });
 
-  const needsApproval = (allowance ?? 0n) < amountWei;
+  // Approve principal + up to 1% (covers the on-chain creation fee, capped at 1%).
+  const approveAmount = amountWei + amountWei / 100n;
+  const needsApproval = (allowance ?? 0n) < approveAmount;
   const maturityTs = maturity ? Math.floor(new Date(maturity).getTime() / 1000) : 0;
 
   const valid =
@@ -77,7 +79,7 @@ export default function CreatePage() {
         address: stablecoin.address,
         abi: ERC20_ABI,
         functionName: "approve",
-        args: [REGISTRY_ADDRESS, amountWei],
+        args: [REGISTRY_ADDRESS, approveAmount],
       });
       await refetchAllowance();
     } catch (e: any) {
@@ -171,6 +173,12 @@ export default function CreatePage() {
           )}
         </div>
         {!isConnected && <p className="text-sm text-muted">Devam etmek için cüzdanınızı bağlayın.</p>}
+
+        <p className="border-t border-line pt-3 text-xs text-muted">
+          Ücretler: oluşturmada <span className="text-ink">%0.1</span>, getiriden{" "}
+          <span className="text-ink">%10</span> protokol payı. Anaparaya hiç dokunulmaz — alacaklı her zaman
+          tam tutarı alır.
+        </p>
       </div>
     </div>
   );

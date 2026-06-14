@@ -21,6 +21,7 @@ async function main() {
   );
 
   await (await registry.setVault(await usdc.getAddress(), await adapter.getAddress(), true)).wait();
+  await (await registry.setFees(0, 0, 0, drawer.address)).wait(); // mechanics check: no fees
 
   const amount = parseUnits("1000", 6);
   const yieldAmount = parseUnits("40", 6);

@@ -48,6 +48,9 @@ async function main() {
   await (await registry.setVault(usdcAddr, adapterAddr, true)).wait();
   console.log(`Whitelisted adapter ${adapterAddr} for ${usdcAddr}`);
 
+  // Zero fees on testnet for simple demos (mainnet deploy.ts keeps real fees).
+  await (await registry.setFees(0, 0, 0, deployer.address)).wait();
+
   // 6. Seed deployer with faucet funds
   await (await usdc.mint(deployer.address, 1_000_000e6)).wait();
   console.log(`Minted 1,000,000 tUSDC to deployer`);
