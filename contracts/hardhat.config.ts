@@ -25,12 +25,19 @@ const config: HardhatUserConfig = {
       chainId: 8453,
       accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
     },
+    // Ethereum mainnet — where Brix iTRY / wiTRY live (production target).
+    mainnet: {
+      url: process.env.MAINNET_RPC_URL ?? "https://eth.llamarpc.com",
+      chainId: 1,
+      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+    },
   },
   etherscan: {
     // BaseScan API key (used by hardhat-verify for both Base and Base Sepolia).
     apiKey: {
       base: process.env.BASESCAN_API_KEY ?? "",
       baseSepolia: process.env.BASESCAN_API_KEY ?? "",
+      mainnet: process.env.ETHERSCAN_API_KEY ?? "",
     },
     customChains: [
       {

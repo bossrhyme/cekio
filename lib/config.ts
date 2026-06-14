@@ -1,4 +1,4 @@
-import { base, baseSepolia, hardhat } from "wagmi/chains";
+import { mainnet, baseSepolia, hardhat } from "wagmi/chains";
 import testnetDeploymentRaw from "./deployment.testnet.json";
 import localDeploymentRaw from "./deployment.local.json";
 
@@ -13,7 +13,8 @@ const localDeployment = localDeploymentRaw as DeploymentFile;
 export const USE_LOCAL = process.env.NEXT_PUBLIC_USE_LOCAL === "true";
 export const USE_TESTNET = process.env.NEXT_PUBLIC_USE_TESTNET === "true";
 
-export const ACTIVE_CHAIN = USE_LOCAL ? hardhat : USE_TESTNET ? baseSepolia : base;
+// Production runs on Ethereum mainnet, where Brix iTRY / wiTRY live.
+export const ACTIVE_CHAIN = USE_LOCAL ? hardhat : USE_TESTNET ? baseSepolia : mainnet;
 
 /** Active deployment file for the selected network (local node or Base Sepolia). */
 const activeDeployment = USE_LOCAL ? localDeployment : testnetDeployment;
@@ -39,8 +40,9 @@ export type Stablecoin = {
  * and the target chain (Ethereum mainnet, where iTRY/wiTRY live).
  */
 const MAINNET_STABLECOINS: Stablecoin[] = [
-  // Default — Brix iTRY (Turkish Lira). Address TBD (verify on docs.brix.money / Etherscan).
-  { symbol: "iTRY", address: "0x0000000000000000000000000000000000000000", decimals: 18 },
+  // Default — Brix iTRY (Turkish Lira), Ethereum mainnet.
+  // TODO: confirm decimals (assumed 18) via Etherscan `decimals()` on the contract below.
+  { symbol: "iTRY", address: "0xb492B4aFD9658093694CF9452D5C272e8230F3B0", decimals: 18 },
   // USDC (Ethereum mainnet)
   { symbol: "USDC", address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", decimals: 6 },
   // USDT (Ethereum mainnet)
@@ -72,11 +74,11 @@ export type LendVault = {
  * (see contracts/INTEGRATIONS.md; run scripts/check-vault.ts before whitelisting).
  */
 const MAINNET_VAULTS: LendVault[] = [
-  // Default — Brix wiTRY: Turkish-Lira money-market yield (ERC-4626 / LayerZero OVault).
+  // Default — Brix wiTRY (ERC-4626): Turkish-Lira money-market yield. Ethereum mainnet.
   {
     label: "Brix wiTRY",
     protocol: "Brix",
-    address: "0x0000000000000000000000000000000000000000",
+    address: "0xE346C29b5B60Ef870b9724c57ccfbBc631e47DEE",
     stablecoin: "iTRY",
     apy: 40,
     risk: "low",

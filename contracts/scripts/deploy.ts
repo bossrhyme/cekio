@@ -10,9 +10,15 @@ import { ethers, network } from "hardhat";
  * Verify every address on-chain before mainnet use — these are placeholders to be filled in.
  */
 const VAULTS: Record<string, { stablecoin: string; vault: string; label: string }[]> = {
-  base: [
-    // { stablecoin: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", vault: "<ERC4626_USDC_VAULT>", label: "USDC vault" },
+  // Ethereum mainnet — Brix iTRY → wiTRY (ERC-4626). Verify with scripts/check-vault.ts first.
+  mainnet: [
+    {
+      stablecoin: "0xb492B4aFD9658093694CF9452D5C272e8230F3B0", // iTRY
+      vault: "0xE346C29b5B60Ef870b9724c57ccfbBc631e47DEE", // wiTRY (ERC-4626)
+      label: "Brix wiTRY (iTRY)",
+    },
   ],
+  base: [],
   baseSepolia: [],
 };
 
