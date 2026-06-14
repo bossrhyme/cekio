@@ -42,8 +42,26 @@ export function SiteHeader() {
             })}
           </nav>
         </div>
-        <ConnectButton showBalance={false} chainStatus="icon" accountStatus="address" />
+        <ConnectButton showBalance={false} chainStatus="icon" accountStatus="avatar" />
       </div>
+
+      {/* Mobile nav */}
+      <nav className="flex items-center gap-1 border-t border-white/10 px-4 py-2 md:hidden">
+        {NAV.map((item) => {
+          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex-1 rounded-lg px-3 py-1.5 text-center text-sm transition ${
+                active ? "bg-white/10 text-white" : "text-muted"
+              }`}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
     </header>
   );
 }
