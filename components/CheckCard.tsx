@@ -74,6 +74,11 @@ export function CheckCard({ check, role }: { check: CheckData; role: "drawer" | 
             {isPending ? "İşleniyor…" : "Tahsil et"}
           </button>
         )}
+        {!check.settled && !matured && role === "holder" && (
+          <Link href={`/check/${check.id}`} className="btn flex-1">
+            Pazaryerinde sat
+          </Link>
+        )}
       </div>
     </div>
   );

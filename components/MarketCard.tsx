@@ -31,9 +31,14 @@ export function MarketCard({
   const faceN = Number(formatUnits(check.principal, dec));
   const priceN = Number(formatUnits(price, dec));
   const discount = check.principal > 0n ? (1 - priceN / faceN) * 100 : 0;
-  // Buyer's annualized return: buy at price now, collect face at maturity.
+  // Buyer's return: buy at price now, collect face at maturity.
   const days = Math.max(1, (Number(check.maturity) - Date.now() / 1000) / 86400);
-  const annual = priceN > 0 ? ((faceN - priceN) / priceN) * (365 / days) * 100 : 0;
+  const daysLeft = Math.max(0, Math.ceil((Number(check.maturity) - Date.now() / 1000) / 86400));
+  const periodReturn = priceN > 0 ? ((faceN - priceN) / priceN) * 100 : 0;
+  const gainN = faceN - priceN;
+  const annual = priceN > 0 ? periodReturn * (365 / days) : 0;
+  const gainStr = gainN.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
+  const sym = stablecoinByAddress(check.stablecoin)?.symbol ?? "";
 
   const { data: allowance, refetch } = useReadContract({
     address: check.stablecoin,
@@ -81,9 +86,18 @@ export function MarketCard({
       </div>
 
       {annual > 0 && (
-        <div className="mt-4 flex items-baseline justify-between rounded-2xl border border-line bg-surface px-4 py-3">
-          <span className="text-xs text-muted">Yıllık getiri (alıcıya)</span>
-          <span className="font-display text-xl font-bold text-tech">~%{annual.toFixed(1)}</span>
+        <div className="mt-4 rounded-2xl border border-line bg-surface px-4 py-3">
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs text-muted">Yıllık getiri (alıcıya)</span>
+            <span className="font-display text-xl font-bold text-tech">~%{annual.toFixed(1)}</span>
+          </div>
+          <p className="mt-1.5 text-xs text-ink/70">
+            <span className="font-semibold text-positive">{daysLeft} gün</span> sonra{" "}
+            <span className="font-semibold text-positive">
+              +{gainStr} {sym}
+            </span>{" "}
+            kazanç (%{periodReturn.toFixed(1)})
+          </p>
         </div>
       )}
 
