@@ -44,14 +44,21 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
 
     struct Listing {
         address seller;
-        uint256 price; // in the cheque's stablecoin
+        uint256 price; // ask price in the cheque's stablecoin (seller receives this; fee is on top)
+    }
+
+    struct Offer {
+        uint256 price; // amount the seller would receive
+        uint256 escrow; // funds locked by the bidder (price + sale fee at offer time)
     }
 
     mapping(uint256 => Check) public checks;
     /// @dev stablecoin => adapter => allowed (owner-curated, low-risk adapters only).
     mapping(address => mapping(address => bool)) public approvedAdapter;
-    /// @dev checkId => secondary-market listing (early sale / "kırdırma").
+    /// @dev checkId => seller listing (Pazaryeri early sale / "kırdırma").
     mapping(uint256 => Listing) public listings;
+    /// @dev checkId => bidder => escrowed offer.
+    mapping(uint256 => mapping(address => Offer)) public offers;
 
     uint256[] private _activeIds;
     mapping(uint256 => uint256) private _activeIndexPlusOne;
@@ -86,6 +93,9 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
     event Listed(uint256 indexed checkId, address indexed seller, uint256 price);
     event ListingCancelled(uint256 indexed checkId);
     event Sold(uint256 indexed checkId, address indexed seller, address indexed buyer, uint256 price, uint256 fee);
+    event OfferMade(uint256 indexed checkId, address indexed bidder, uint256 price);
+    event OfferCancelled(uint256 indexed checkId, address indexed bidder);
+    event OfferAccepted(uint256 indexed checkId, address indexed seller, address indexed bidder, uint256 price, uint256 fee);
     event FeesUpdated(uint16 perfFeeBps, uint16 createFeeBps, uint16 saleFeeBps, address treasury);
 
     error ZeroAddress();
@@ -102,6 +112,8 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
     error FeeTooHigh();
     error NotHolder();
     error NotListed();
+    error NoOffer();
+    error OfferExists();
 
     constructor(address initialOwner) ERC721("OnChain Check", "CHK") Ownable(initialOwner) {
         treasury = initialOwner;
@@ -320,8 +332,8 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
         emit ListingCancelled(checkId);
     }
 
-    /// @notice Buy a listed cheque: buyer pays `price` in the cheque's stablecoin; a sale fee goes to
-    ///         the treasury, the rest to the seller, and the cheque NFT transfers to the buyer.
+    /// @notice Instant-buy a listed cheque. Buyer pays `price` to the seller plus the sale fee on top
+    ///         to the treasury; the cheque NFT transfers to the buyer.
     function buy(uint256 checkId) external nonReentrant {
         Listing memory l = listings[checkId];
         if (l.price == 0) revert NotListed();
@@ -330,14 +342,54 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
         if (ownerOf(checkId) != l.seller) revert NotListed(); // stale listing
 
         uint256 fee = (l.price * saleFeeBps) / 10_000;
-        uint256 toSeller = l.price - fee;
         delete listings[checkId];
 
-        IERC20(c.stablecoin).safeTransferFrom(msg.sender, l.seller, toSeller);
-        if (fee > 0) IERC20(c.stablecoin).safeTransferFrom(msg.sender, treasury, fee);
+        IERC20(c.stablecoin).safeTransferFrom(msg.sender, l.seller, l.price); // seller gets full price
+        if (fee > 0) IERC20(c.stablecoin).safeTransferFrom(msg.sender, treasury, fee); // buyer pays fee on top
         _transfer(l.seller, msg.sender, checkId);
 
         emit Sold(checkId, l.seller, msg.sender, l.price, fee);
+    }
+
+    /// @notice Place a bid on a cheque. The bidder escrows `price` + the sale fee; the seller can
+    ///         accept it. One active offer per bidder; cancel to replace.
+    function makeOffer(uint256 checkId, uint256 price) external nonReentrant {
+        Check storage c = checks[checkId];
+        if (c.drawer == address(0)) revert UnknownCheck();
+        if (c.settled) revert AlreadySettled();
+        if (price == 0) revert ZeroAmount();
+        if (offers[checkId][msg.sender].escrow != 0) revert OfferExists();
+
+        uint256 fee = (price * saleFeeBps) / 10_000;
+        uint256 escrow = price + fee;
+        offers[checkId][msg.sender] = Offer({price: price, escrow: escrow});
+        IERC20(c.stablecoin).safeTransferFrom(msg.sender, address(this), escrow);
+        emit OfferMade(checkId, msg.sender, price);
+    }
+
+    /// @notice Withdraw your offer and reclaim the escrow (any time).
+    function cancelOffer(uint256 checkId) external nonReentrant {
+        Offer memory o = offers[checkId][msg.sender];
+        if (o.escrow == 0) revert NoOffer();
+        delete offers[checkId][msg.sender];
+        IERC20(checks[checkId].stablecoin).safeTransfer(msg.sender, o.escrow);
+        emit OfferCancelled(checkId, msg.sender);
+    }
+
+    /// @notice Seller accepts a bidder's offer: seller receives `price`, treasury the fee, bidder the NFT.
+    function acceptOffer(uint256 checkId, address bidder) external nonReentrant {
+        if (ownerOf(checkId) != msg.sender) revert NotHolder();
+        Check storage c = checks[checkId];
+        if (c.settled) revert AlreadySettled();
+        Offer memory o = offers[checkId][bidder];
+        if (o.escrow == 0) revert NoOffer();
+        delete offers[checkId][bidder];
+
+        uint256 fee = o.escrow - o.price;
+        IERC20(c.stablecoin).safeTransfer(msg.sender, o.price); // seller proceeds
+        if (fee > 0) IERC20(c.stablecoin).safeTransfer(treasury, fee); // protocol fee
+        _transfer(msg.sender, bidder, checkId);
+        emit OfferAccepted(checkId, msg.sender, bidder, o.price, fee);
     }
 
     // --------------------------------------------------------------------- endorsement

@@ -7,6 +7,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 const NAV = [
   { href: "/", label: "Anasayfa" },
   { href: "/dashboard", label: "Pano" },
+  { href: "/market", label: "Pazaryeri" },
   { href: "/create", label: "Çek Oluştur" },
 ];
 

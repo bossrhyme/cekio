@@ -264,23 +264,55 @@ describe("CheckRegistry (adapter model)", () => {
       expect((await env.usdc.balanceOf(env.drawer.address)) - drawerBefore).to.be.closeTo(90_000_000n, 2n); // 90%
     });
 
-    it("secondary sale: buyer gets the cheque, seller paid minus 0.5% fee", async () => {
+    it("instant buy: seller gets full price, buyer pays 0.5% fee on top", async () => {
       const env = await fixture();
-      // Treasury = owner; buyer = third. Create fee 0 here to isolate the 0.5% sale fee.
       await env.registry.connect(env.owner).setFees(1000, 0, 50, env.owner.address);
       await create(env, await env.instant.getAddress(), 30 * DAY); // payee holds cheque #1
       const price = 970_000_000n; // 970 USDC (early discount on 1,000 face)
+      const fee = (price * 50n) / 10_000n;
       await env.registry.connect(env.payee).listForSale(1, price);
 
-      await env.usdc.mint(env.third.address, price);
-      await env.usdc.connect(env.third).approve(await env.registry.getAddress(), price);
+      await env.usdc.mint(env.third.address, price + fee);
+      await env.usdc.connect(env.third).approve(await env.registry.getAddress(), price + fee);
       const treBefore = await env.usdc.balanceOf(env.owner.address);
 
       await env.registry.connect(env.third).buy(1);
+      expect(await env.registry.ownerOf(1)).to.equal(env.third.address);
+      expect(await env.usdc.balanceOf(env.payee.address)).to.equal(price); // seller gets full price
+      expect((await env.usdc.balanceOf(env.owner.address)) - treBefore).to.equal(fee); // buyer-paid fee
+    });
+
+    it("offers: bidder escrows, seller accepts, NFT moves and fee taken", async () => {
+      const env = await fixture();
+      await env.registry.connect(env.owner).setFees(1000, 0, 50, env.owner.address);
+      await create(env, await env.instant.getAddress(), 30 * DAY); // payee holds cheque #1
+      const price = 950_000_000n;
       const fee = (price * 50n) / 10_000n;
-      expect(await env.registry.ownerOf(1)).to.equal(env.third.address); // buyer now holds it
-      expect(await env.usdc.balanceOf(env.payee.address)).to.equal(price - fee); // seller proceeds
-      expect((await env.usdc.balanceOf(env.owner.address)) - treBefore).to.equal(fee); // treasury fee
+
+      // Bidder = third escrows price + fee.
+      await env.usdc.mint(env.third.address, price + fee);
+      await env.usdc.connect(env.third).approve(await env.registry.getAddress(), price + fee);
+      await env.registry.connect(env.third).makeOffer(1, price);
+      expect(await env.usdc.balanceOf(await env.registry.getAddress())).to.equal(price + fee);
+
+      const treBefore = await env.usdc.balanceOf(env.owner.address);
+      await env.registry.connect(env.payee).acceptOffer(1, env.third.address);
+      expect(await env.registry.ownerOf(1)).to.equal(env.third.address);
+      expect(await env.usdc.balanceOf(env.payee.address)).to.equal(price);
+      expect((await env.usdc.balanceOf(env.owner.address)) - treBefore).to.equal(fee);
+    });
+
+    it("offers can be cancelled and refunded", async () => {
+      const env = await fixture();
+      await env.registry.connect(env.owner).setFees(1000, 0, 50, env.owner.address);
+      await create(env, await env.instant.getAddress(), 30 * DAY);
+      const price = 900_000_000n;
+      const fee = (price * 50n) / 10_000n;
+      await env.usdc.mint(env.third.address, price + fee);
+      await env.usdc.connect(env.third).approve(await env.registry.getAddress(), price + fee);
+      await env.registry.connect(env.third).makeOffer(1, price);
+      await env.registry.connect(env.third).cancelOffer(1);
+      expect(await env.usdc.balanceOf(env.third.address)).to.equal(price + fee); // refunded
     });
   });
 });

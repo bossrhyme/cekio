@@ -7,6 +7,8 @@ import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { CHECK_REGISTRY_ABI } from "@/lib/abi";
 import { REGISTRY_ADDRESS } from "@/lib/config";
 import { fmtAmount, fmtDate, isMatured, shortAddr } from "@/lib/format";
+import { MarketActions } from "@/components/MarketActions";
+import type { CheckData } from "@/lib/useChecks";
 
 const registry = { address: REGISTRY_ADDRESS, abi: CHECK_REGISTRY_ABI } as const;
 
@@ -129,6 +131,14 @@ export default function CheckDetailPage() {
       {/* Actions */}
       {!c.settled && (
         <div className="space-y-4">
+          <MarketActions
+            check={{ id, stablecoin: c.stablecoin, principal: c.principal, holder } as unknown as CheckData}
+            isHolder={isHolder}
+            refresh={() => {
+              refetch();
+              refetchHolder();
+            }}
+          />
           {isHolder && (
             <div className="card">
               <h2 className="font-display text-lg font-semibold">Ciro et</h2>
