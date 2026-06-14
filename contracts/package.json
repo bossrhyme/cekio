@@ -5,10 +5,16 @@
   "license": "MIT",
   "scripts": {
     "compile": "hardhat compile",
-    "test": "hardhat test"
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "e2e": "hardhat run scripts/e2e-local.ts",
+    "deploy:testnet": "hardhat run scripts/deploy-testnet.ts --network baseSepolia",
+    "demo:testnet": "hardhat run scripts/demo.ts --network baseSepolia",
+    "verify:testnet": "hardhat verify --network baseSepolia"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.6.1",
     "hardhat": "^2.22.10",
     "solc": "^0.8.24",
     "typescript": "^5.6.3"
