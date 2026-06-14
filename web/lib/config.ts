@@ -1,5 +1,6 @@
-import { base, baseSepolia } from "wagmi/chains";
+import { base, baseSepolia, hardhat } from "wagmi/chains";
 import testnetDeploymentRaw from "./deployment.testnet.json";
+import localDeploymentRaw from "./deployment.local.json";
 
 type DeploymentFile = {
   registry: string;
@@ -7,17 +8,23 @@ type DeploymentFile = {
   vaults: { label: string; address: string; stablecoin: string; apy?: number }[];
 };
 const testnetDeployment = testnetDeploymentRaw as DeploymentFile;
+const localDeployment = localDeploymentRaw as DeploymentFile;
 
+export const USE_LOCAL = process.env.NEXT_PUBLIC_USE_LOCAL === "true";
 export const USE_TESTNET = process.env.NEXT_PUBLIC_USE_TESTNET === "true";
-export const ACTIVE_CHAIN = USE_TESTNET ? baseSepolia : base;
+
+export const ACTIVE_CHAIN = USE_LOCAL ? hardhat : USE_TESTNET ? baseSepolia : base;
+
+/** Active deployment file for the selected network (local node or Base Sepolia). */
+const activeDeployment = USE_LOCAL ? localDeployment : testnetDeployment;
 
 /**
  * Deployed CheckRegistry address.
- * On testnet it is auto-loaded from deployment.testnet.json (written by `deploy-testnet.ts`);
+ * Auto-loaded from the deployment JSON (written by `deploy-testnet.ts`);
  * env NEXT_PUBLIC_REGISTRY_ADDRESS overrides it if set.
  */
 export const REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ??
-  (USE_TESTNET ? testnetDeployment.registry : undefined) ??
+  (USE_LOCAL || USE_TESTNET ? activeDeployment.registry : undefined) ??
   "0x0000000000000000000000000000000000000000") as `0x${string}`;
 
 export type Stablecoin = {
@@ -33,14 +40,14 @@ const MAINNET_STABLECOINS: Stablecoin[] = [
   { symbol: "DAI", address: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb", decimals: 18 },
 ];
 
-const TESTNET_STABLECOINS: Stablecoin[] = testnetDeployment.stablecoins.map((s) => ({
+const DEPLOYED_STABLECOINS: Stablecoin[] = activeDeployment.stablecoins.map((s) => ({
   symbol: s.symbol,
   address: s.address as `0x${string}`,
   decimals: s.decimals,
 }));
 
 export const STABLECOINS: Stablecoin[] =
-  USE_TESTNET && TESTNET_STABLECOINS.length > 0 ? TESTNET_STABLECOINS : MAINNET_STABLECOINS;
+  (USE_LOCAL || USE_TESTNET) && DEPLOYED_STABLECOINS.length > 0 ? DEPLOYED_STABLECOINS : MAINNET_STABLECOINS;
 
 export type LendVault = {
   label: string;
@@ -83,9 +90,9 @@ const MAINNET_VAULTS: LendVault[] = [
   },
 ];
 
-const TESTNET_VAULTS: LendVault[] = testnetDeployment.vaults.map((v: any) => ({
+const DEPLOYED_VAULTS: LendVault[] = activeDeployment.vaults.map((v) => ({
   label: v.label,
-  protocol: "Testnet",
+  protocol: USE_LOCAL ? "Local" : "Testnet",
   address: v.address as `0x${string}`,
   stablecoin: v.stablecoin,
   apy: v.apy ?? 5,
@@ -93,4 +100,4 @@ const TESTNET_VAULTS: LendVault[] = testnetDeployment.vaults.map((v: any) => ({
 }));
 
 export const LEND_VAULTS: LendVault[] =
-  USE_TESTNET && TESTNET_VAULTS.length > 0 ? TESTNET_VAULTS : MAINNET_VAULTS;
+  (USE_LOCAL || USE_TESTNET) && DEPLOYED_VAULTS.length > 0 ? DEPLOYED_VAULTS : MAINNET_VAULTS;

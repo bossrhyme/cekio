@@ -1,0 +1,8 @@
+{
+  "network": "localhost",
+  "chainId": 31337,
+  "registry": "0x0000000000000000000000000000000000000000",
+  "stablecoins": [],
+  "vaults": [],
+  "deployedAt": ""
+}
