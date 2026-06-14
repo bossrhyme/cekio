@@ -66,7 +66,7 @@ export default function CheckDetailPage() {
 
   return (
     <div className="container-app max-w-2xl space-y-6 py-10">
-      <Link href="/dashboard" className="text-sm text-muted hover:text-white">
+      <Link href="/dashboard" className="text-sm text-muted hover:text-ink">
         ← Panoya dön
       </Link>
 
@@ -84,13 +84,13 @@ export default function CheckDetailPage() {
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+          <div className="rounded-2xl border border-line bg-surface p-4">
             <p className="text-xs text-muted">Güncel değer</p>
             <p className="mt-1 font-display text-lg font-semibold">
               {currentValue !== undefined ? fmtAmount(currentValue as bigint, c.stablecoin) : "…"}
             </p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+          <div className="rounded-2xl border border-line bg-surface p-4">
             <p className="text-xs text-muted">Biriken getiri (keşideciye)</p>
             <p className="mt-1 font-display text-lg font-semibold text-positive">
               {yieldAmount !== undefined ? fmtAmount(yieldAmount as bigint, c.stablecoin) : "…"}
@@ -100,7 +100,7 @@ export default function CheckDetailPage() {
 
         {!c.settled && (
           <div className="mt-5">
-            <div className="h-2 overflow-hidden rounded-full bg-white/10">
+            <div className="h-2 overflow-hidden rounded-full bg-surface">
               <div className="h-full rounded-full bg-accent-grad" style={{ width: `${progress}%` }} />
             </div>
             <p className="mt-2 text-xs text-muted">
@@ -113,7 +113,7 @@ export default function CheckDetailPage() {
       {/* Details */}
       <div className="card">
         <h2 className="font-display text-lg font-semibold">Kontrat detayları</h2>
-        <dl className="mt-4 divide-y divide-white/5 text-sm">
+        <dl className="mt-4 divide-y divide-line text-sm">
           <Row label="Vade tarihi" value={fmtDate(c.maturity)} />
           <Row label="Oluşturulma" value={fmtDate(c.createdAt)} />
           <Row label="Keşideci" value={shortAddr(c.drawer)} mono />
@@ -147,7 +147,7 @@ export default function CheckDetailPage() {
           <div className="card">
             <h2 className="font-display text-lg font-semibold">Ödeme</h2>
             {/* Transaction preview */}
-            <div className="mt-4 space-y-2 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-sm">
+            <div className="mt-4 space-y-2 rounded-2xl border border-line bg-surface p-4 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted">Alacaklıya (anapara)</span>
                 <span>{fmtAmount(c.principal, c.stablecoin)}</span>

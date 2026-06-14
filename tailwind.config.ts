@@ -5,45 +5,38 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#080a18",
-        panel: "#0e1124",
-        surface: "#12162e",
-        accent: { DEFAULT: "#6c8cff", soft: "#8aa2ff" },
-        cyan: { DEFAULT: "#34d0e0" },
-        positive: "#3ddc97",
-        warn: "#f5a623",
-        danger: "#ff6b6b",
-        muted: "#8b93b0",
+        // Warm "parchment" palette
+        ink: "#2c2118", // primary text (warm dark brown)
+        cream: "#faf4ea", // page background
+        card: "#fffaf2", // card surface
+        surface: "#f4ebda", // subtle warm inner panels
+        line: "#eadfcb", // warm borders
+        accent: { DEFAULT: "#dd7a45", soft: "#eca878" }, // terracotta
+        gold: "#e7b35c",
+        positive: "#5da06a",
+        warn: "#d99a2f",
+        danger: "#d4634a",
+        muted: "#9a8c76", // warm taupe
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
-        display: ["Space Grotesk", "Inter", "system-ui", "sans-serif"],
+        display: ["Fraunces", "Georgia", "serif"],
       },
       backgroundImage: {
-        "accent-grad": "linear-gradient(110deg, #6c8cff 0%, #8a6cff 45%, #34d0e0 100%)",
-        "glow-radial": "radial-gradient(60% 60% at 50% 0%, rgba(108,140,255,0.18) 0%, rgba(8,10,24,0) 70%)",
+        "accent-grad": "linear-gradient(110deg, #dd7a45 0%, #e79a4c 55%, #e7b35c 100%)",
+        "glow-radial": "radial-gradient(60% 60% at 50% 0%, rgba(221,122,69,0.16) 0%, rgba(250,244,234,0) 70%)",
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(108,140,255,0.15), 0 20px 60px -20px rgba(108,140,255,0.35)",
-        card: "0 10px 40px -20px rgba(0,0,0,0.6)",
+        glow: "0 0 0 1px rgba(221,122,69,0.12), 0 24px 60px -24px rgba(176,108,54,0.4)",
+        card: "0 16px 40px -28px rgba(120,80,40,0.35)",
+        soft: "0 2px 10px -4px rgba(120,80,40,0.18)",
       },
       keyframes: {
-        floaty: {
-          "0%,100%": { transform: "translateY(0px)" },
-          "50%": { transform: "translateY(-8px)" },
-        },
-        shimmer: {
-          "0%": { backgroundPosition: "0% 50%" },
-          "100%": { backgroundPosition: "200% 50%" },
-        },
-        "fade-up": {
-          "0%": { opacity: "0", transform: "translateY(12px)" },
-          "100%": { opacity: "1", transform: "translateY(0)" },
-        },
+        floaty: { "0%,100%": { transform: "translateY(0px)" }, "50%": { transform: "translateY(-8px)" } },
+        "fade-up": { "0%": { opacity: "0", transform: "translateY(12px)" }, "100%": { opacity: "1", transform: "translateY(0)" } },
       },
       animation: {
         floaty: "floaty 6s ease-in-out infinite",
-        shimmer: "shimmer 6s linear infinite",
         "fade-up": "fade-up 0.6s ease-out both",
       },
     },

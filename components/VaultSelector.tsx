@@ -27,18 +27,18 @@ export function VaultSelector({
             type="button"
             key={v.address}
             onClick={() => onChange(v.address)}
-            className={`text-left rounded-xl border p-4 transition ${
-              selected ? "border-accent bg-accent/10" : "border-white/10 hover:border-white/30"
+            className={`text-left rounded-2xl border p-4 transition ${
+              selected ? "border-accent bg-accent/10" : "border-line hover:border-accent/40 hover:bg-surface"
             }`}
           >
             <div className="flex items-center justify-between">
               <span className="font-medium">{v.label}</span>
-              <span className="text-accent font-semibold">{v.apy}% APY</span>
+              <span className="font-semibold text-accent">%{v.apy} APY</span>
             </div>
             <div className="mt-1 flex items-center gap-2 text-xs text-muted">
               <span>{v.protocol}</span>
               <span>·</span>
-              <span className={v.risk === "low" ? "text-emerald-400" : "text-amber-400"}>
+              <span className={v.risk === "low" ? "text-positive" : "text-warn"}>
                 {v.risk === "low" ? "düşük risk" : "orta risk"}
               </span>
             </div>
