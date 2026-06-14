@@ -101,8 +101,12 @@ export default function CreatePage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="mb-6 text-2xl font-semibold">Çek Oluştur</h1>
+    <div className="container-app max-w-2xl py-10">
+      <p className="eyebrow">Yeni çek</p>
+      <h1 className="mb-1 mt-2 font-display text-3xl font-bold">Çek Oluştur</h1>
+      <p className="mb-6 text-sm text-muted">
+        Tutarı kilitle, vadeyi ve lend platformunu seç. Çek alacaklıya NFT olarak basılır.
+      </p>
 
       <div className="card space-y-5">
         {/* UI #2 — alıcı bilgileri */}

@@ -27,48 +27,51 @@ export function CheckCard({ check, role }: { check: CheckData; role: "drawer" | 
       args: [check.id],
     });
 
+  const status = check.settled
+    ? { label: "Ödendi", cls: "text-muted" }
+    : matured
+      ? { label: "Vadesi geldi", cls: "text-positive" }
+      : { label: "Vade bekleniyor", cls: "text-accent-soft" };
+
   return (
-    <div className="card">
+    <div className="card card-hover flex flex-col">
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-2xl font-semibold">{fmtAmount(check.principal, check.stablecoin)}</div>
+          <div className="font-display text-2xl font-bold">{fmtAmount(check.principal, check.stablecoin)}</div>
           <div className="text-sm text-muted">Çek #{check.id.toString()}</div>
         </div>
-        <span
-          className={`rounded-full px-3 py-1 text-xs ${
-            check.settled
-              ? "bg-white/10 text-muted"
-              : matured
-                ? "bg-emerald-500/15 text-emerald-400"
-                : "bg-accent/15 text-accent"
-          }`}
-        >
-          {check.settled ? "Ödendi" : matured ? "Vadesi geldi" : "Vade bekleniyor"}
+        <span className={`pill ${status.cls}`}>
+          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+          {status.label}
         </span>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-y-2 text-sm">
-        <dt className="text-muted">Vade</dt>
-        <dd className="text-right">{fmtDate(check.maturity)}</dd>
-        <dt className="text-muted">{role === "drawer" ? "Alacaklı" : "Keşideci"}</dt>
-        <dd className="text-right">{shortAddr(role === "drawer" ? check.holder : check.drawer)}</dd>
+      <dl className="mt-5 space-y-2.5 text-sm">
+        <div className="flex items-center justify-between">
+          <dt className="text-muted">Vade</dt>
+          <dd>{fmtDate(check.maturity)}</dd>
+        </div>
+        <div className="flex items-center justify-between">
+          <dt className="text-muted">{role === "drawer" ? "Alacaklı" : "Keşideci"}</dt>
+          <dd className="font-mono">{shortAddr(role === "drawer" ? check.holder : check.drawer)}</dd>
+        </div>
         {!check.settled && (
-          <>
+          <div className="flex items-center justify-between">
             <dt className="text-muted">Biriken getiri</dt>
-            <dd className="text-right text-emerald-400">
+            <dd className="text-positive">
               {yieldAmount !== undefined ? fmtAmount(yieldAmount as bigint, check.stablecoin) : "…"}
             </dd>
-          </>
+          </div>
         )}
       </dl>
 
-      <div className="mt-4 flex gap-2">
+      <div className="mt-6 flex gap-2">
         <Link href={`/check/${check.id}`} className="btn-ghost flex-1">
           Detay
         </Link>
         {!check.settled && matured && (
           <button className="btn flex-1" onClick={settle} disabled={isPending}>
-            {isPending ? "İşleniyor…" : "Ödemeyi tamamla"}
+            {isPending ? "İşleniyor…" : "Tahsil et"}
           </button>
         )}
       </div>

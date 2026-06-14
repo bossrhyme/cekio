@@ -27,7 +27,7 @@ export default function CheckDetailPage() {
   const { data: yieldAmount } = useReadContract({ ...registry, functionName: "accruedYield", args: [id] });
   const { data: currentValue } = useReadContract({ ...registry, functionName: "currentValue", args: [id] });
 
-  if (!check) return <p className="text-muted">Yükleniyor…</p>;
+  if (!check) return <p className="container-app py-10 text-muted">Yükleniyor…</p>;
   const c = check as any;
   const matured = isMatured(c.maturity);
   const isHolder = holder?.toLowerCase() === address?.toLowerCase();
@@ -59,15 +59,16 @@ export default function CheckDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="container-app max-w-2xl space-y-6 py-10">
       <div className="card">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Çek #{id.toString()}</h1>
+          <h1 className="font-display text-2xl font-bold">Çek #{id.toString()}</h1>
           <span
-            className={`rounded-full px-3 py-1 text-xs ${
-              c.settled ? "bg-white/10 text-muted" : matured ? "bg-emerald-500/15 text-emerald-400" : "bg-accent/15 text-accent"
+            className={`pill ${
+              c.settled ? "text-muted" : matured ? "text-positive" : "text-accent-soft"
             }`}
           >
+            <span className="h-1.5 w-1.5 rounded-full bg-current" />
             {c.settled ? "Ödendi" : matured ? "Vadesi geldi" : "Vade bekleniyor"}
           </span>
         </div>
