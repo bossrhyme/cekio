@@ -1,5 +1,7 @@
+import fs from "fs";
+import path from "path";
 import { ethers, network } from "hardhat";
-import { writeDeployment } from "./deployments";
+import { writeDeployment, Deployment } from "./deployments";
 
 /**
  * Testnet deployment (Base Sepolia or local hardhat node).
@@ -43,15 +45,25 @@ async function main() {
   await (await usdc.mint(deployer.address, 1_000_000e6)).wait();
   console.log(`Minted 1,000,000 tUSDC to deployer`);
 
-  const file = writeDeployment({
+  const deployment: Deployment = {
     network: network.name,
     chainId: Number(net.chainId),
     registry: registryAddr,
     stablecoins: [{ symbol: "tUSDC", address: usdcAddr, decimals: 6 }],
     vaults: [{ label: "Test Yield USDC", address: vaultAddr, stablecoin: "tUSDC", apy: 5 }],
     deployedAt: new Date().toISOString(),
-  });
+  };
+  const file = writeDeployment(deployment);
   console.log(`\nDeployment written to ${file}`);
+
+  // Also feed the frontend's auto-load file (web/lib/deployment.testnet.json) for Base Sepolia.
+  if (network.name === "baseSepolia") {
+    const webFile = path.resolve(__dirname, "..", "..", "web", "lib", "deployment.testnet.json");
+    if (fs.existsSync(path.dirname(webFile))) {
+      fs.writeFileSync(webFile, JSON.stringify(deployment, null, 2) + "\n");
+      console.log(`Frontend deployment written to ${webFile}`);
+    }
+  }
 }
 
 main().catch((e) => {
