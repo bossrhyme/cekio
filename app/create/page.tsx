@@ -82,7 +82,8 @@ export default function CreatePage() {
     const grossYield = (principalN * (apy / 100) * days) / 365;
     const perfFee = (grossYield * perfBps) / 10000;
     return {
-      ok: principalN > 0 && days > 0 && /^0x[a-fA-F0-9]{40}$/.test(vault),
+      costReady: principalN > 0,
+      yieldReady: principalN > 0 && days > 0 && /^0x[a-fA-F0-9]{40}$/.test(vault),
       principalN,
       days: Math.ceil(days),
       apy,
@@ -194,24 +195,36 @@ export default function CreatePage() {
         </div>
 
         {/* Maliyet & vade sonu özeti */}
-        {summary.ok && (
+        {summary.costReady && (
           <div className="panel-soft p-4">
-            <p className="mb-3 text-sm font-semibold">Özet ({summary.days} gün vade)</p>
+            <p className="mb-3 text-sm font-semibold">
+              Özet{summary.yieldReady ? ` (${summary.days} gün vade)` : ""}
+            </p>
             <dl className="space-y-2 text-sm">
               <Line k="Çek tutarı (anapara)" v={fmt(summary.principalN)} />
               <Line k={`Oluşturma ücreti (%${(summary.createBps / 100).toFixed(2)})`} v={`+ ${fmt(summary.createFee)}`} muted />
               <div className="my-2 border-t border-line" />
               <Line k="Şimdi ödenecek toplam" v={fmt(summary.totalNow)} strong />
-              <div className="my-2 border-t border-line" />
-              <Line k={`Tahmini getiri (~%${summary.apy} yıllık)`} v={`+ ${fmt(summary.grossYield)}`} tech />
-              <Line k={`Protokol payı (%${(summary.perfBps / 100).toFixed(0)} getiriden)`} v={`− ${fmt(summary.perfFee)}`} muted />
-              <Line k="Vade sonunda sana dönen getiri" v={fmt(summary.netYield)} positive />
-              <Line k="Vade sonunda alacaklıya ödenecek" v={fmt(summary.principalN)} />
+              {summary.yieldReady ? (
+                <>
+                  <div className="my-2 border-t border-line" />
+                  <Line k={`Tahmini getiri (~%${summary.apy} yıllık)`} v={`+ ${fmt(summary.grossYield)}`} tech />
+                  <Line k={`Protokol payı (%${(summary.perfBps / 100).toFixed(0)} getiriden)`} v={`− ${fmt(summary.perfFee)}`} muted />
+                  <Line k="Vade sonunda sana dönen getiri" v={fmt(summary.netYield)} positive />
+                  <Line k="Vade sonunda alacaklıya ödenecek" v={fmt(summary.principalN)} />
+                </>
+              ) : (
+                <p className="pt-1 text-xs text-muted">
+                  Vade tarihi ve lend platformu seçince tahmini getiri burada görünür.
+                </p>
+              )}
             </dl>
-            <p className="mt-3 text-xs text-muted">
-              Getiri tahminîdir; gerçek oran lend platformunun değişken APY'sine göre belirlenir. Anapara her
-              zaman tam ödenir.
-            </p>
+            {summary.yieldReady && (
+              <p className="mt-3 text-xs text-muted">
+                Getiri tahminîdir; gerçek oran lend platformunun değişken APY'sine göre belirlenir. Anapara her
+                zaman tam ödenir.
+              </p>
+            )}
           </div>
         )}
 
