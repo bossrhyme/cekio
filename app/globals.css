@@ -2,16 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light;
-}
+:root { color-scheme: light; }
 
 body {
   @apply bg-cream text-ink antialiased font-sans;
+}
+
+.bg-grid {
   background-image:
-    radial-gradient(60% 45% at 50% -5%, rgba(231, 179, 92, 0.18), rgba(250, 244, 234, 0) 70%),
-    radial-gradient(45% 35% at 100% 0%, rgba(221, 122, 69, 0.12), rgba(250, 244, 234, 0) 60%);
-  background-repeat: no-repeat;
+    linear-gradient(rgba(26,23,20,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(26,23,20,0.045) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(65% 65% at 50% 30%, #000 0%, transparent 75%);
 }
 
 @layer components {
@@ -19,50 +21,37 @@ body {
     @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
   }
 
-  /* Warm surfaces */
   .card {
-    @apply rounded-3xl border border-line bg-card p-6 shadow-card;
+    @apply rounded-lg border border-line bg-card p-6 shadow-card;
   }
   .card-hover {
-    @apply transition duration-300 hover:-translate-y-0.5 hover:shadow-glow;
+    @apply transition-shadow duration-200 hover:shadow-glow hover:border-accent/30;
   }
   .panel-soft {
-    @apply rounded-2xl border border-line bg-surface;
+    @apply rounded-md border border-line bg-surface;
   }
 
-  /* Form controls */
   .label {
-    @apply mb-1.5 block text-sm font-medium text-ink/70;
+    @apply mb-1.5 block text-sm font-medium text-ink/60;
   }
   .input {
-    @apply w-full rounded-xl border border-line bg-cream px-3.5 py-2.5 text-ink outline-none transition placeholder:text-ink/30 focus:border-accent focus:ring-2 focus:ring-accent/20;
+    @apply w-full rounded-md border border-line bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-accent focus:ring-2 focus:ring-accent/15;
   }
 
-  /* Buttons */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full bg-accent-grad px-5 py-2.5 font-semibold text-white shadow-soft transition hover:opacity-95 hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-md bg-accent-grad px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:opacity-90 hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-45;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border border-line bg-card px-5 py-2.5 font-medium text-ink transition hover:border-accent/40 hover:bg-surface;
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-line bg-card px-5 py-2.5 text-sm font-medium text-ink transition hover:border-accent/50 hover:bg-surface;
   }
 
-  /* Text helpers */
   .gradient-text {
     @apply bg-accent-grad bg-clip-text text-transparent;
   }
   .pill {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1 text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 rounded border border-line bg-surface px-2.5 py-0.5 text-xs font-medium tracking-wide;
   }
   .eyebrow {
-    @apply text-xs font-semibold uppercase tracking-[0.18em] text-accent;
+    @apply text-[11px] font-bold uppercase tracking-[0.2em] text-accent;
   }
-}
-
-/* Subtle warm grid texture for hero */
-.bg-grid {
-  background-image:
-    linear-gradient(rgba(120, 80, 40, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(120, 80, 40, 0.05) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(60% 60% at 50% 30%, #000 0%, transparent 75%);
 }
