@@ -155,6 +155,11 @@ export const CHECK_REGISTRY_ABI = [
   },
   {
     "inputs": [],
+    "name": "MigrationNotReady",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NoOffer",
     "type": "error"
   },
@@ -181,6 +186,11 @@ export const CHECK_REGISTRY_ABI = [
   {
     "inputs": [],
     "name": "NotParty",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotRescued",
     "type": "error"
   },
   {
@@ -511,6 +521,75 @@ export const CHECK_REGISTRY_ABI = [
       }
     ],
     "name": "ListingCancelled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "target",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "assets",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "shares",
+        "type": "uint256"
+      }
+    ],
+    "name": "MigrationApproved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      }
+    ],
+    "name": "MigrationCancelled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "by",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "target",
+        "type": "address"
+      }
+    ],
+    "name": "MigrationRequested",
     "type": "event"
   },
   {
@@ -937,6 +1016,19 @@ export const CHECK_REGISTRY_ABI = [
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      }
+    ],
+    "name": "approveMigration",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "",
         "type": "address"
@@ -999,6 +1091,19 @@ export const CHECK_REGISTRY_ABI = [
       }
     ],
     "name": "cancelListing",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      }
+    ],
+    "name": "cancelMigration",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1373,6 +1478,35 @@ export const CHECK_REGISTRY_ABI = [
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "migrations",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "target",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "drawerOk",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "holderOk",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "name",
     "outputs": [
@@ -1534,6 +1668,24 @@ export const CHECK_REGISTRY_ABI = [
   {
     "inputs": [],
     "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "newAdapter",
+        "type": "address"
+      }
+    ],
+    "name": "requestMigration",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

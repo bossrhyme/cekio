@@ -79,8 +79,23 @@ If a vault is deprecated, paused, or fails before a cheque matures:
 3. At maturity, `settle` pays the holder from the rescued funds (schedule preserved).
 
 This gates self-rescue behind a guardian flag, so a healthy vault can't be drained on a whim, while
-the legitimate parties can always recover principal once a vault is genuinely compromised. Future
-work: keeper-driven flagging, adapter→adapter migration, and a fee-funded safety fund.
+the legitimate parties can always recover principal once a vault is genuinely compromised.
+
+### Redeploying rescued funds (adapter migration)
+
+Once principal is in idle holding (rescued), it can be redeployed into another approved adapter so it
+keeps earning yield until maturity. This is **two-sided + guardian-gated**:
+
+1. The **drawer** and the **current holder** each call `requestMigration(checkId, newAdapter)` with the
+   *same* target. Requesting a different target resets prior consent (both must re-agree).
+2. The **guardian (owner/multisig)** calls `approveMigration(checkId)` — only valid once both consented.
+   The target must be whitelisted, not itself flagged, and leave time for its own cooldown before
+   maturity. Funds are deposited into the new adapter and the position resumes accruing.
+3. Either party or the guardian can `cancelMigration(checkId)` to clear a pending request.
+
+This keeps a single party from unilaterally moving someone else's money, while letting the legitimate
+parties opt back into yield after a vault failure. Future work: keeper-driven flagging and a
+fee-funded safety fund.
 
 ## Open items to confirm (Brix, before mainnet)
 

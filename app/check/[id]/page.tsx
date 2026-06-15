@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { CHECK_REGISTRY_ABI } from "@/lib/abi";
-import { REGISTRY_ADDRESS } from "@/lib/config";
+import { REGISTRY_ADDRESS, STABLECOINS, LEND_VAULTS } from "@/lib/config";
 import { fmtAmount, fmtDate, isMatured, shortAddr } from "@/lib/format";
 import { MarketActions } from "@/components/MarketActions";
 import type { CheckData } from "@/lib/useChecks";
@@ -35,13 +35,31 @@ export default function CheckDetailPage() {
     args: [(check as any)?.adapter ?? "0x0000000000000000000000000000000000000000"],
     query: { enabled: !!check },
   });
-  const { data: rescued } = useReadContract({ ...registry, functionName: "rescued", args: [id] });
+  const { data: rescued, refetch: refetchRescued } = useReadContract({ ...registry, functionName: "rescued", args: [id] });
+  const { data: migration, refetch: refetchMigration } = useReadContract({ ...registry, functionName: "migrations", args: [id] });
+  const { data: registryOwner } = useReadContract({ ...registry, functionName: "owner" });
+
+  const [migrationTarget, setMigrationTarget] = useState("");
 
   if (!check) return <p className="container-app py-10 text-muted">Yükleniyor…</p>;
   const c = check as any;
   const matured = isMatured(c.maturity);
   const isHolder = holder?.toLowerCase() === address?.toLowerCase();
   const isDrawer = c.drawer?.toLowerCase() === address?.toLowerCase();
+  const isGuardian = (registryOwner as string)?.toLowerCase() === address?.toLowerCase();
+
+  // migrations() returns [target, drawerOk, holderOk]
+  const mg = migration as readonly [string, boolean, boolean] | undefined;
+  const mTarget = mg?.[0] ?? "0x0000000000000000000000000000000000000000";
+  const mDrawerOk = mg?.[1] ?? false;
+  const mHolderOk = mg?.[2] ?? false;
+  const hasMigration = mTarget !== "0x0000000000000000000000000000000000000000";
+
+  // Vaults eligible as a migration target: same stablecoin, not the (flagged) current adapter.
+  const sym = STABLECOINS.find((s) => s.address.toLowerCase() === c.stablecoin?.toLowerCase())?.symbol;
+  const targetVaults = LEND_VAULTS.filter(
+    (v) => v.stablecoin === sym && v.address.toLowerCase() !== c.adapter?.toLowerCase(),
+  );
 
   async function emergencyExit() {
     setError("");
@@ -50,6 +68,37 @@ export default function CheckDetailPage() {
       await refetch();
     } catch (e: any) {
       setError(e?.shortMessage ?? "Acil çıkış başarısız");
+    }
+  }
+
+  async function requestMigration() {
+    setError("");
+    if (!/^0x[a-fA-F0-9]{40}$/.test(migrationTarget)) return setError("Bir hedef vault seçin");
+    try {
+      await writeContractAsync({ ...registry, functionName: "requestMigration", args: [id, migrationTarget as `0x${string}`] });
+      await refetchMigration();
+    } catch (e: any) {
+      setError(e?.shortMessage ?? "Geçiş talebi başarısız");
+    }
+  }
+
+  async function approveMigration() {
+    setError("");
+    try {
+      await writeContractAsync({ ...registry, functionName: "approveMigration", args: [id] });
+      await Promise.all([refetch(), refetchRescued(), refetchMigration()]);
+    } catch (e: any) {
+      setError(e?.shortMessage ?? "Onay başarısız");
+    }
+  }
+
+  async function cancelMigration() {
+    setError("");
+    try {
+      await writeContractAsync({ ...registry, functionName: "cancelMigration", args: [id] });
+      await refetchMigration();
+    } catch (e: any) {
+      setError(e?.shortMessage ?? "İptal başarısız");
     }
   }
 
@@ -162,6 +211,79 @@ export default function CheckDetailPage() {
                 {isPending ? "İşleniyor…" : "Acil çıkış (anaparayı güvene al)"}
               </button>
             )
+          )}
+        </div>
+      ) : null}
+
+      {/* Migration: redeploy rescued principal into a new vault (two-sided consent + guardian) */}
+      {!c.settled && rescued ? (
+        <div className="card">
+          <h2 className="font-display text-lg font-semibold">Yeni vault'a taşı</h2>
+          <p className="mt-1 text-sm text-muted">
+            Güvene alınan anapara, yeniden getiri kazanması için başka bir lend platformuna taşınabilir.
+            Geçiş için <span className="text-ink">hem keşideci hem alacaklı</span> aynı hedefi onaylamalı,
+            ardından guardian işlemi gerçekleştirir.
+          </p>
+
+          {/* Consent state */}
+          {hasMigration && (
+            <div className="mt-4 rounded-2xl border border-line bg-surface p-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted">Hedef vault</span>
+                <span className="font-mono">
+                  {LEND_VAULTS.find((v) => v.address.toLowerCase() === mTarget.toLowerCase())?.label ??
+                    shortAddr(mTarget)}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-muted">Keşideci onayı</span>
+                <span className={mDrawerOk ? "text-positive" : "text-muted"}>{mDrawerOk ? "✓ verildi" : "bekleniyor"}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between">
+                <span className="text-muted">Alacaklı onayı</span>
+                <span className={mHolderOk ? "text-positive" : "text-muted"}>{mHolderOk ? "✓ verildi" : "bekleniyor"}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Party action: pick target + consent */}
+          {(isHolder || isDrawer) && (
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <select
+                className="input"
+                value={migrationTarget || mTarget}
+                onChange={(e) => setMigrationTarget(e.target.value)}
+              >
+                <option value="">Hedef vault seç…</option>
+                {targetVaults.map((v) => (
+                  <option key={v.address} value={v.address}>
+                    {v.label} (~%{v.apy})
+                  </option>
+                ))}
+              </select>
+              <button className="btn-ghost whitespace-nowrap" onClick={requestMigration} disabled={isPending}>
+                {(isDrawer && mDrawerOk) || (isHolder && mHolderOk) ? "Onayı güncelle" : "Geçişi onayla"}
+              </button>
+            </div>
+          )}
+
+          {/* Guardian action */}
+          {isGuardian && hasMigration && (
+            <button className="btn mt-3 w-full" onClick={approveMigration} disabled={isPending || !mDrawerOk || !mHolderOk}>
+              {mDrawerOk && mHolderOk ? "Guardian: onayla ve taşı" : "İki taraf da onaylamadı"}
+            </button>
+          )}
+
+          {hasMigration && (isHolder || isDrawer || isGuardian) && (
+            <button className="mt-2 text-xs text-muted hover:text-ink" onClick={cancelMigration} disabled={isPending}>
+              Geçiş talebini iptal et
+            </button>
+          )}
+
+          {targetVaults.length === 0 && (
+            <p className="mt-3 text-xs text-muted">
+              Bu para birimi için uygun başka vault yok. Anapara vadede güvenle ödenecek.
+            </p>
           )}
         </div>
       ) : null}

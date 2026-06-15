@@ -247,6 +247,102 @@ describe("CheckRegistry (adapter model)", () => {
     });
   });
 
+  describe("adapter migration (two-sided consent + guardian)", () => {
+    async function rescued(env: Env) {
+      const { maturity } = await create(env, await env.instant.getAddress(), 30 * DAY);
+      await env.registry.connect(env.owner).setAdapterEmergency(await env.instant.getAddress(), true);
+      await env.registry.connect(env.payee).emergencyExit(1);
+      // A fresh, healthy instant adapter to migrate into.
+      const vaultN = await (await ethers.getContractFactory("MockERC4626")).deploy(await env.usdc.getAddress());
+      const target = await (await ethers.getContractFactory("ERC4626Adapter")).deploy(
+        await vaultN.getAddress(),
+        await env.registry.getAddress(),
+      );
+      await env.registry.connect(env.owner).setVault(await env.usdc.getAddress(), await target.getAddress(), true);
+      return { maturity, target, vaultN };
+    }
+
+    it("requires both parties + guardian; redeploys principal and resumes yield", async () => {
+      const env = await fixture();
+      const { maturity, target, vaultN } = await rescued(env);
+      const targetAddr = await target.getAddress();
+
+      // Only a party may request.
+      await expect(env.registry.connect(env.third).requestMigration(1, targetAddr)).to.be.revertedWithCustomError(
+        env.registry,
+        "NotParty",
+      );
+      // Guardian can't approve before both consent.
+      await env.registry.connect(env.drawer).requestMigration(1, targetAddr);
+      await expect(env.registry.connect(env.owner).approveMigration(1)).to.be.revertedWithCustomError(
+        env.registry,
+        "MigrationNotReady",
+      );
+      // Holder consents too → guardian executes.
+      await env.registry.connect(env.payee).requestMigration(1, targetAddr);
+      await env.registry.connect(env.owner).approveMigration(1);
+
+      // Position now lives in the new adapter; rescued cleared.
+      expect((await env.registry.getCheck(1)).adapter).to.equal(targetAddr);
+      expect(await env.registry.rescued(1)).to.equal(false);
+      expect(await vaultN.balanceOf(targetAddr)).to.be.greaterThan(0n);
+
+      // Yield resumes and is paid to the drawer at maturity.
+      await donate(env, vaultN, 15_000_000n);
+      await time.increaseTo(maturity);
+      await env.registry.settle(1);
+      expect(await env.usdc.balanceOf(env.payee.address)).to.equal(env.amount);
+      expect(await env.usdc.balanceOf(env.drawer.address)).to.be.greaterThan(0n);
+    });
+
+    it("changing the target resets prior consent", async () => {
+      const env = await fixture();
+      const { target } = await rescued(env);
+      const targetAddr = await target.getAddress();
+
+      // A second valid target.
+      const vault2 = await (await ethers.getContractFactory("MockERC4626")).deploy(await env.usdc.getAddress());
+      const target2 = await (await ethers.getContractFactory("ERC4626Adapter")).deploy(
+        await vault2.getAddress(),
+        await env.registry.getAddress(),
+      );
+      await env.registry.connect(env.owner).setVault(await env.usdc.getAddress(), await target2.getAddress(), true);
+
+      await env.registry.connect(env.drawer).requestMigration(1, targetAddr);
+      await env.registry.connect(env.payee).requestMigration(1, targetAddr);
+      // Drawer changes mind → switches target, which clears holder's consent.
+      await env.registry.connect(env.drawer).requestMigration(1, await target2.getAddress());
+      await expect(env.registry.connect(env.owner).approveMigration(1)).to.be.revertedWithCustomError(
+        env.registry,
+        "MigrationNotReady",
+      );
+      // Holder re-consents to the new target → now it can execute.
+      await env.registry.connect(env.payee).requestMigration(1, await target2.getAddress());
+      await env.registry.connect(env.owner).approveMigration(1);
+      expect((await env.registry.getCheck(1)).adapter).to.equal(await target2.getAddress());
+    });
+
+    it("rejects migration when funds aren't rescued, and to a flagged target", async () => {
+      const env = await fixture();
+      // No rescue yet → cannot request.
+      await create(env, await env.instant.getAddress(), 30 * DAY);
+      await expect(env.registry.connect(env.drawer).requestMigration(1, await env.cool.getAddress())).to.be.revertedWithCustomError(
+        env.registry,
+        "NotRescued",
+      );
+
+      // Now rescue, then try to migrate into a flagged adapter.
+      const { target } = await rescued(env);
+      await env.registry.connect(env.owner).setAdapterEmergency(await target.getAddress(), true);
+      await env.registry.connect(env.drawer).requestMigration(1, await target.getAddress());
+      await env.registry.connect(env.payee).requestMigration(1, await target.getAddress());
+      await expect(env.registry.connect(env.owner).approveMigration(1)).to.be.revertedWithCustomError(
+        env.registry,
+        "AdapterNotApproved",
+      );
+    });
+  });
+
   it("reports accrued yield (instant)", async () => {
     const env = await fixture();
     await create(env, await env.instant.getAddress(), 30 * DAY);

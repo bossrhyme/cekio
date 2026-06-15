@@ -52,6 +52,15 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
         uint256 escrow; // funds locked by the bidder (price + sale fee at offer time)
     }
 
+    /// @dev Two-sided migration request for redeploying emergency-exited principal into a new adapter.
+    ///      Both the drawer and the current holder must consent to the *same* target; the guardian
+    ///      then executes. Changing the target resets both consents.
+    struct Migration {
+        address target; // proposed new adapter
+        bool drawerOk; // drawer (keşideci) consented
+        bool holderOk; // current holder (alacaklı) consented
+    }
+
     mapping(uint256 => Check) public checks;
     /// @dev stablecoin => adapter => allowed (owner-curated, low-risk adapters only).
     mapping(address => mapping(address => bool)) public approvedAdapter;
@@ -65,6 +74,8 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
     mapping(uint256 => uint256) public rescuedAssets;
     /// @dev checkId => funds have been emergency-exited to idle holding.
     mapping(uint256 => bool) public rescued;
+    /// @dev checkId => pending two-sided migration request for rescued funds.
+    mapping(uint256 => Migration) public migrations;
 
     uint256[] private _activeIds;
     mapping(uint256 => uint256) private _activeIndexPlusOne;
@@ -105,6 +116,9 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
     event FeesUpdated(uint16 perfFeeBps, uint16 createFeeBps, uint16 saleFeeBps, address treasury);
     event AdapterEmergencySet(address indexed adapter, bool flagged);
     event EmergencyExited(uint256 indexed checkId, address indexed by, uint256 assets);
+    event MigrationRequested(uint256 indexed checkId, address indexed by, address indexed target);
+    event MigrationCancelled(uint256 indexed checkId);
+    event MigrationApproved(uint256 indexed checkId, address indexed target, uint256 assets, uint256 shares);
 
     error ZeroAddress();
     error ZeroAmount();
@@ -124,6 +138,8 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
     error OfferExists();
     error NotEmergency();
     error NotParty();
+    error NotRescued();
+    error MigrationNotReady();
 
     constructor(address initialOwner) ERC721("OnChain Check", "CHK") Ownable(initialOwner) {
         treasury = initialOwner;
@@ -260,6 +276,74 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
         rescuedAssets[checkId] = got;
         rescued[checkId] = true;
         emit EmergencyExited(checkId, msg.sender, got);
+    }
+
+    // --------------------------------------------------------------------- adapter migration
+    /// @notice Drawer or holder requests redeploying emergency-exited principal into a new approved
+    ///         adapter. Both parties must consent to the *same* target before the guardian executes.
+    ///         Requesting a different target resets prior consent. Only valid once funds are rescued
+    ///         (idle) via emergencyExit.
+    function requestMigration(uint256 checkId, address newAdapter) external {
+        Check storage c = checks[checkId];
+        if (c.drawer == address(0)) revert UnknownCheck();
+        if (c.settled) revert AlreadySettled();
+        if (!rescued[checkId]) revert NotRescued();
+        if (!approvedAdapter[c.stablecoin][newAdapter]) revert AdapterNotApproved();
+
+        bool isDrawer = msg.sender == c.drawer;
+        bool isHolder = msg.sender == ownerOf(checkId);
+        if (!isDrawer && !isHolder) revert NotParty();
+
+        Migration storage m = migrations[checkId];
+        if (m.target != newAdapter) {
+            // New/changed target invalidates any prior consent.
+            m.target = newAdapter;
+            m.drawerOk = false;
+            m.holderOk = false;
+        }
+        if (isDrawer) m.drawerOk = true;
+        if (isHolder) m.holderOk = true;
+        emit MigrationRequested(checkId, msg.sender, newAdapter);
+    }
+
+    /// @notice Withdraw a pending migration request (either party, or the guardian).
+    function cancelMigration(uint256 checkId) external {
+        Check storage c = checks[checkId];
+        if (c.drawer == address(0)) revert UnknownCheck();
+        if (msg.sender != c.drawer && msg.sender != ownerOf(checkId) && msg.sender != owner()) revert NotParty();
+        delete migrations[checkId];
+        emit MigrationCancelled(checkId);
+    }
+
+    /// @notice Guardian executes a migration both parties consented to: rescued funds are redeployed
+    ///         into the agreed adapter and yield resumes until maturity.
+    function approveMigration(uint256 checkId) external onlyOwner nonReentrant {
+        Check storage c = checks[checkId];
+        if (c.drawer == address(0)) revert UnknownCheck();
+        if (c.settled) revert AlreadySettled();
+        if (!rescued[checkId]) revert NotRescued();
+
+        Migration memory m = migrations[checkId];
+        if (m.target == address(0) || !m.drawerOk || !m.holderOk) revert MigrationNotReady();
+        if (!approvedAdapter[c.stablecoin][m.target] || adapterEmergency[m.target]) revert AdapterNotApproved();
+        // Target must still leave time to complete its own redemption cooldown before maturity.
+        if (c.maturity <= block.timestamp + ILendingAdapter(m.target).cooldown()) revert MaturityTooSoon();
+
+        uint256 amount = rescuedAssets[checkId];
+        rescuedAssets[checkId] = 0;
+        rescued[checkId] = false;
+        delete migrations[checkId];
+
+        IERC20(c.stablecoin).safeTransfer(m.target, amount);
+        uint256 shares = ILendingAdapter(m.target).deposit(amount);
+
+        c.adapter = m.target;
+        c.shares = shares;
+        c.redeemStarted = false;
+        c.redeemTicket = 0;
+        c.claimableAt = 0;
+
+        emit MigrationApproved(checkId, m.target, amount, shares);
     }
 
     function _settle(uint256 checkId) internal {
