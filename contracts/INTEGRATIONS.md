@@ -68,6 +68,20 @@ This flow is covered by tests via `MockCooldownAdapter`.
 Whitelist the **adapter** (not the raw vault): `registry.setVault(asset, adapter, true)`. Deploy
 adapters via `scripts/deploy.ts` (`adapterType: "erc4626" | "brix"`).
 
+## Vault expiry / failure handling (emergency exit)
+
+If a vault is deprecated, paused, or fails before a cheque matures:
+
+1. The **guardian (owner/multisig)** flags the adapter: `setAdapterEmergency(adapter, true)`.
+2. Only then may the cheque's **drawer or current holder** call `emergencyExit(checkId)` — this pulls
+   the principal out of the vault into idle holding in the registry (for cooldown adapters: call once
+   to start the unstake, again after the cooldown). Yield stops, principal is preserved.
+3. At maturity, `settle` pays the holder from the rescued funds (schedule preserved).
+
+This gates self-rescue behind a guardian flag, so a healthy vault can't be drained on a whim, while
+the legitimate parties can always recover principal once a vault is genuinely compromised. Future
+work: keeper-driven flagging, adapter→adapter migration, and a fee-funded safety fund.
+
 ## Open items to confirm (Brix, before mainnet)
 
 - [ ] **Confirm wiTRY's exact ABI** — `BrixWiTRYAdapter`/`IBrixWiTRY` assume Ethena-style

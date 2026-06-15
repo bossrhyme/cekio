@@ -29,11 +29,29 @@ export default function CheckDetailPage() {
   });
   const { data: yieldAmount } = useReadContract({ ...registry, functionName: "accruedYield", args: [id] });
   const { data: currentValue } = useReadContract({ ...registry, functionName: "currentValue", args: [id] });
+  const { data: adapterEmergency } = useReadContract({
+    ...registry,
+    functionName: "adapterEmergency",
+    args: [(check as any)?.adapter ?? "0x0000000000000000000000000000000000000000"],
+    query: { enabled: !!check },
+  });
+  const { data: rescued } = useReadContract({ ...registry, functionName: "rescued", args: [id] });
 
   if (!check) return <p className="container-app py-10 text-muted">Yükleniyor…</p>;
   const c = check as any;
   const matured = isMatured(c.maturity);
   const isHolder = holder?.toLowerCase() === address?.toLowerCase();
+  const isDrawer = c.drawer?.toLowerCase() === address?.toLowerCase();
+
+  async function emergencyExit() {
+    setError("");
+    try {
+      await writeContractAsync({ ...registry, functionName: "emergencyExit", args: [id] });
+      await refetch();
+    } catch (e: any) {
+      setError(e?.shortMessage ?? "Acil çıkış başarısız");
+    }
+  }
 
   async function endorse() {
     setError("");
@@ -127,6 +145,26 @@ export default function CheckDetailPage() {
       {error && (
         <p className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>
       )}
+
+      {/* Emergency: vault flagged as expired */}
+      {!c.settled && adapterEmergency ? (
+        <div className="card border-warn/50 bg-warn/5">
+          <h2 className="font-display text-lg font-semibold text-warn">Lend platformu donduruldu</h2>
+          <p className="mt-1 text-sm text-ink/70">
+            Bu çekin lend platformu acil durum olarak işaretlendi. Anapara güvene çekilebilir; vade gününde
+            normal şekilde ödenir.
+          </p>
+          {rescued ? (
+            <p className="mt-3 text-sm font-medium text-positive">Anapara güvene alındı — vadede ödenecek.</p>
+          ) : (
+            (isHolder || isDrawer) && (
+              <button className="btn mt-4" onClick={emergencyExit} disabled={isPending}>
+                {isPending ? "İşleniyor…" : "Acil çıkış (anaparayı güvene al)"}
+              </button>
+            )
+          )}
+        </div>
+      ) : null}
 
       {/* Actions */}
       {!c.settled && (

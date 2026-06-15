@@ -160,6 +160,11 @@ export const CHECK_REGISTRY_ABI = [
   },
   {
     "inputs": [],
+    "name": "NotEmergency",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NotHolder",
     "type": "error"
   },
@@ -171,6 +176,11 @@ export const CHECK_REGISTRY_ABI = [
   {
     "inputs": [],
     "name": "NotMatured",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotParty",
     "type": "error"
   },
   {
@@ -240,6 +250,25 @@ export const CHECK_REGISTRY_ABI = [
     "inputs": [],
     "name": "ZeroAmount",
     "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "adapter",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "flagged",
+        "type": "bool"
+      }
+    ],
+    "name": "AdapterEmergencySet",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -363,6 +392,31 @@ export const CHECK_REGISTRY_ABI = [
       }
     ],
     "name": "CheckCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "by",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "assets",
+        "type": "uint256"
+      }
+    ],
+    "name": "EmergencyExited",
     "type": "event"
   },
   {
@@ -847,6 +901,25 @@ export const CHECK_REGISTRY_ABI = [
     "inputs": [
       {
         "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "adapterEmergency",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "to",
         "type": "address"
       },
@@ -1105,6 +1178,19 @@ export const CHECK_REGISTRY_ABI = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "checkId",
+        "type": "uint256"
+      }
+    ],
+    "name": "emergencyExit",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1455,6 +1541,44 @@ export const CHECK_REGISTRY_ABI = [
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "rescued",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "rescuedAssets",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "from",
         "type": "address"
@@ -1514,6 +1638,24 @@ export const CHECK_REGISTRY_ABI = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "adapter",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "flagged",
+        "type": "bool"
+      }
+    ],
+    "name": "setAdapterEmergency",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

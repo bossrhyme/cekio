@@ -59,6 +59,12 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
     mapping(uint256 => Listing) public listings;
     /// @dev checkId => bidder => escrowed offer.
     mapping(uint256 => mapping(address => Offer)) public offers;
+    /// @dev adapter => flagged as expired/unhealthy by the guardian (enables emergencyExit).
+    mapping(address => bool) public adapterEmergency;
+    /// @dev checkId => assets pulled to idle holding via emergencyExit (settled at maturity).
+    mapping(uint256 => uint256) public rescuedAssets;
+    /// @dev checkId => funds have been emergency-exited to idle holding.
+    mapping(uint256 => bool) public rescued;
 
     uint256[] private _activeIds;
     mapping(uint256 => uint256) private _activeIndexPlusOne;
@@ -97,6 +103,8 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
     event OfferCancelled(uint256 indexed checkId, address indexed bidder);
     event OfferAccepted(uint256 indexed checkId, address indexed seller, address indexed bidder, uint256 price, uint256 fee);
     event FeesUpdated(uint16 perfFeeBps, uint16 createFeeBps, uint16 saleFeeBps, address treasury);
+    event AdapterEmergencySet(address indexed adapter, bool flagged);
+    event EmergencyExited(uint256 indexed checkId, address indexed by, uint256 assets);
 
     error ZeroAddress();
     error ZeroAmount();
@@ -114,6 +122,8 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
     error NotListed();
     error NoOffer();
     error OfferExists();
+    error NotEmergency();
+    error NotParty();
 
     constructor(address initialOwner) ERC721("OnChain Check", "CHK") Ownable(initialOwner) {
         treasury = initialOwner;
@@ -140,6 +150,13 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
         saleFeeBps = saleFeeBps_;
         treasury = treasury_;
         emit FeesUpdated(perfFeeBps_, createFeeBps_, saleFeeBps_, treasury_);
+    }
+
+    /// @notice Guardian flags/unflags an adapter as expired/unhealthy. Only while flagged may the
+    ///         cheque parties (drawer or holder) emergency-exit their principal from it.
+    function setAdapterEmergency(address adapter, bool flagged) external onlyOwner {
+        adapterEmergency[adapter] = flagged;
+        emit AdapterEmergencySet(adapter, flagged);
     }
 
     function pause() external onlyOwner {
@@ -219,29 +236,63 @@ contract CheckRegistry is ERC721, Ownable2Step, Pausable, ReentrancyGuard, Autom
         _settle(checkId);
     }
 
+    /// @notice Emergency-exit a cheque's principal from an adapter the guardian flagged as expired,
+    ///         into idle holding (paid out at maturity by settle). Callable by the drawer or holder.
+    ///         For cooldown adapters: call once to start the unstake, again after the cooldown to finish.
+    function emergencyExit(uint256 checkId) external nonReentrant {
+        Check storage c = checks[checkId];
+        if (c.drawer == address(0)) revert UnknownCheck();
+        if (c.settled || rescued[checkId]) revert AlreadySettled();
+        if (msg.sender != c.drawer && msg.sender != ownerOf(checkId)) revert NotParty();
+        if (!adapterEmergency[c.adapter]) revert NotEmergency();
+
+        if (!c.redeemStarted) {
+            (uint256 ticket, uint256 claimableAt) = ILendingAdapter(c.adapter).startRedeem(c.shares);
+            c.redeemStarted = true;
+            c.redeemTicket = ticket;
+            c.claimableAt = uint64(claimableAt);
+            emit RedeemStarted(checkId, ticket, uint64(claimableAt));
+            if (block.timestamp < claimableAt) return; // cooldown: finish in a later call
+        }
+        if (block.timestamp < c.claimableAt) revert RedeemNotReady();
+
+        uint256 got = ILendingAdapter(c.adapter).completeRedeem(c.redeemTicket, address(this));
+        rescuedAssets[checkId] = got;
+        rescued[checkId] = true;
+        emit EmergencyExited(checkId, msg.sender, got);
+    }
+
     function _settle(uint256 checkId) internal {
         Check storage c = checks[checkId];
         if (c.drawer == address(0)) revert UnknownCheck();
         if (c.settled) revert AlreadySettled();
         if (block.timestamp < c.maturity) revert NotMatured();
 
-        uint256 cd = ILendingAdapter(c.adapter).cooldown();
-        if (!c.redeemStarted) {
-            if (cd != 0) revert RedeemNotReady(); // cooldown vaults must be prepared first
-            (uint256 ticket, uint256 claimableAt) = ILendingAdapter(c.adapter).startRedeem(c.shares);
-            c.redeemStarted = true;
-            c.redeemTicket = ticket;
-            c.claimableAt = uint64(claimableAt);
+        uint256 redeemed;
+        if (rescued[checkId]) {
+            // Funds already pulled to idle holding via emergencyExit.
+            redeemed = rescuedAssets[checkId];
+            rescuedAssets[checkId] = 0;
+            c.settled = true;
+            _removeActive(checkId);
+        } else {
+            uint256 cd = ILendingAdapter(c.adapter).cooldown();
+            if (!c.redeemStarted) {
+                if (cd != 0) revert RedeemNotReady(); // cooldown vaults must be prepared first
+                (uint256 ticket, uint256 claimableAt) = ILendingAdapter(c.adapter).startRedeem(c.shares);
+                c.redeemStarted = true;
+                c.redeemTicket = ticket;
+                c.claimableAt = uint64(claimableAt);
+            }
+            if (block.timestamp < c.claimableAt) revert RedeemNotReady();
+            c.settled = true;
+            _removeActive(checkId);
+            redeemed = ILendingAdapter(c.adapter).completeRedeem(c.redeemTicket, address(this));
         }
-        if (block.timestamp < c.claimableAt) revert RedeemNotReady();
 
-        // Effects before payout.
-        c.settled = true;
-        _removeActive(checkId);
         address payee = ownerOf(checkId);
         _burn(checkId);
 
-        uint256 redeemed = ILendingAdapter(c.adapter).completeRedeem(c.redeemTicket, address(this));
         // Holder is always made whole on principal first; only the yield is fee-bearing.
         uint256 toPayee = redeemed >= c.principal ? c.principal : redeemed;
         uint256 yieldAmt = redeemed - toPayee;

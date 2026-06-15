@@ -217,6 +217,36 @@ describe("CheckRegistry (adapter model)", () => {
     });
   });
 
+  describe("emergency exit (expired vault)", () => {
+    it("party rescues from a flagged adapter; principal paid at maturity", async () => {
+      const env = await fixture();
+      const { maturity } = await create(env, await env.instant.getAddress(), 30 * DAY);
+      await donate(env, env.vaultI, 20_000_000n);
+
+      // Not flagged → cannot exit.
+      await expect(env.registry.connect(env.payee).emergencyExit(1)).to.be.revertedWithCustomError(
+        env.registry,
+        "NotEmergency",
+      );
+      // Guardian flags the adapter as expired.
+      await env.registry.connect(env.owner).setAdapterEmergency(await env.instant.getAddress(), true);
+      // Non-party cannot exit.
+      await expect(env.registry.connect(env.owner).emergencyExit(1)).to.be.revertedWithCustomError(
+        env.registry,
+        "NotParty",
+      );
+      // Holder rescues → funds moved to idle holding.
+      await env.registry.connect(env.payee).emergencyExit(1);
+      expect(await env.registry.rescued(1)).to.equal(true);
+
+      // Still paid only at maturity (schedule preserved).
+      await expect(env.registry.settle(1)).to.be.revertedWithCustomError(env.registry, "NotMatured");
+      await time.increaseTo(maturity);
+      await env.registry.settle(1);
+      expect(await env.usdc.balanceOf(env.payee.address)).to.equal(env.amount);
+    });
+  });
+
   it("reports accrued yield (instant)", async () => {
     const env = await fixture();
     await create(env, await env.instant.getAddress(), 30 * DAY);
