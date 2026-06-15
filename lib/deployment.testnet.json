@@ -1,6 +1,6 @@
 {
-  "network": "baseSepolia",
-  "chainId": 84532,
+  "network": "sepolia",
+  "chainId": 11155111,
   "registry": "0x0000000000000000000000000000000000000000",
   "stablecoins": [],
   "vaults": [],

@@ -11,6 +11,9 @@
     "deploy:local": "hardhat run scripts/deploy-testnet.ts --network localhost",
     "automation:local": "hardhat run scripts/automation-demo.ts --network localhost",
     "deploy:testnet": "hardhat run scripts/deploy-testnet.ts --network baseSepolia",
+    "deploy:sepolia": "hardhat run scripts/deploy-testnet.ts --network sepolia",
+    "demo:sepolia": "hardhat run scripts/demo.ts --network sepolia",
+    "verify:sepolia": "hardhat verify --network sepolia",
     "demo:testnet": "hardhat run scripts/demo.ts --network baseSepolia",
     "verify:testnet": "hardhat verify --network baseSepolia"
   },

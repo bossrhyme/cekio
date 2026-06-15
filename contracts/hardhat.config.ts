@@ -31,6 +31,12 @@ const config: HardhatUserConfig = {
       chainId: 1,
       accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
     },
+    // Ethereum Sepolia testnet — self-contained testbed (deploys its own faucet token + vault).
+    sepolia: {
+      url: process.env.SEPOLIA_RPC_URL ?? "https://ethereum-sepolia-rpc.publicnode.com",
+      chainId: 11155111,
+      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+    },
   },
   etherscan: {
     // BaseScan API key (used by hardhat-verify for both Base and Base Sepolia).
@@ -38,6 +44,7 @@ const config: HardhatUserConfig = {
       base: process.env.BASESCAN_API_KEY ?? "",
       baseSepolia: process.env.BASESCAN_API_KEY ?? "",
       mainnet: process.env.ETHERSCAN_API_KEY ?? "",
+      sepolia: process.env.ETHERSCAN_API_KEY ?? "",
     },
     customChains: [
       {

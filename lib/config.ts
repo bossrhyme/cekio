@@ -1,4 +1,4 @@
-import { mainnet, baseSepolia, hardhat } from "wagmi/chains";
+import { mainnet, sepolia, hardhat } from "wagmi/chains";
 import testnetDeploymentRaw from "./deployment.testnet.json";
 import localDeploymentRaw from "./deployment.local.json";
 
@@ -13,8 +13,8 @@ const localDeployment = localDeploymentRaw as DeploymentFile;
 export const USE_LOCAL = process.env.NEXT_PUBLIC_USE_LOCAL === "true";
 export const USE_TESTNET = process.env.NEXT_PUBLIC_USE_TESTNET === "true";
 
-// Production runs on Ethereum mainnet, where Brix iTRY / wiTRY live.
-export const ACTIVE_CHAIN = USE_LOCAL ? hardhat : USE_TESTNET ? baseSepolia : mainnet;
+// Production runs on Ethereum mainnet, where Brix iTRY / wiTRY live. Testnet = Ethereum Sepolia.
+export const ACTIVE_CHAIN = USE_LOCAL ? hardhat : USE_TESTNET ? sepolia : mainnet;
 
 /** Active deployment file for the selected network (local node or Base Sepolia). */
 const activeDeployment = USE_LOCAL ? localDeployment : testnetDeployment;

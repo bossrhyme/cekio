@@ -67,10 +67,10 @@ async function main() {
   const file = writeDeployment(deployment);
   console.log(`\nDeployment written to ${file}`);
 
-  // Feed the frontend's auto-load file: deployment.testnet.json for Base Sepolia,
+  // Feed the frontend's auto-load file: deployment.testnet.json for Base/Ethereum Sepolia,
   // deployment.local.json for the local node testbed. The frontend lives at the repo root.
   const webName =
-    network.name === "baseSepolia"
+    network.name === "baseSepolia" || network.name === "sepolia"
       ? "deployment.testnet.json"
       : network.name === "localhost" || network.name === "hardhat"
         ? "deployment.local.json"
